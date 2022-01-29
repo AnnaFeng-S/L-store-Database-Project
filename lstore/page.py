@@ -6,9 +6,17 @@ class Page:
         self.data = bytearray(4096)
 
     def has_capacity(self):
-        pass
+        if self.num_records == 512:
+            return False
+        else:
+            return True
 
     def write(self, value):
         self.num_records += 1
-        pass
+        self.data[(self.num_records-1) * 8: self.num_records * 8] = value.to_bytes(8, byteorder='big')
 
+    def read(self, index):
+        return int.from_bytes(self.data[index * 8: index * 8 + 8], byteorder='big')
+
+    def update(self, index, value):
+        self.data[index * 8: index * 8 + 8] = value.to_bytes(8, byteorder='big')
