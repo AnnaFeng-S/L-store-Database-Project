@@ -1,6 +1,6 @@
 from lstore.table import Table, Record
 from lstore.index import Index
-import time
+
 
 class Query:
     """
@@ -31,7 +31,6 @@ class Query:
 
     def insert(self, *columns):
         schema_encoding = '0' * self.table.num_columns
-        time_stamp = time.time()
         pass
 
     """
