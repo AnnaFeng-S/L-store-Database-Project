@@ -1,4 +1,5 @@
 from lstore.index import Index
+from lstore.page_range import Page_Range
 from time import time
 
 INDIRECTION_COLUMN = 0
@@ -27,9 +28,26 @@ class Table:
         self.num_columns = num_columns
         self.page_directory = {}
         self.index = Index(self)
+        self.page_ranges = []
+        self.next_range = 0
+        self.next_brid = 0
+        self.next_trid = 0
         pass
 
     def __merge(self):
         print("merge is happening")
         pass
+
+    def insert(self, record):
+        pass
+
+    def delete(self, primary_key):
+        pass
+
+    def select(self, index_key, column, query_columns):
+        pass
+
+    def update(self, primary_key, *columns):
+        pass
+
  

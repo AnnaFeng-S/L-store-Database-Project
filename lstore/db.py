@@ -4,6 +4,7 @@ class Database():
 
     def __init__(self):
         self.tables = []
+        print("Database created")
         pass
 
     # Not required for milestone1
@@ -20,7 +21,9 @@ class Database():
     :param key: int             #Index of table key in columns
     """
     def create_table(self, name, num_columns, key_index):
+        print("Table " + name + " created")
         table = Table(name, num_columns, key_index)
+        self.tables.append(table)
         return table
 
     """
