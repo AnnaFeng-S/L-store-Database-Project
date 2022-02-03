@@ -41,9 +41,8 @@ class Page_Range:
         return (self.next_trid - 1)
         
     def b_write(self, value):
-        if not(self.has_capacity()):
-            return False
         if (self.next_brid%512 == 0):
+            print("New Base Page")
             self.new_base_page()
         record = []
         record.append(self.getNextRID())
@@ -52,10 +51,7 @@ class Page_Range:
         record.append(int(round(datetime.datetime.now().timestamp())))
         record = record + value
         self.base_page[self.next_bpage-1].write(record)
-        location = []
-        location.append(self.next_bpage-1)
-        location.append(record[0]%512)
-        return location
+        return record[0]
 
     def b_read(self, page_index, index):
         record = []

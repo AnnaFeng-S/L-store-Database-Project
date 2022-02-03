@@ -1,6 +1,6 @@
 from lstore.table import Table, Record
 from lstore.index import Index
-
+from lstore.page import Page
 
 class Query:
     """
@@ -30,8 +30,19 @@ class Query:
     """
 
     def insert(self, *columns):
-        schema_encoding = '0' * self.table.num_columns
+        if len(self.table.page_range_list)==0:
+            self.table.new_page_range()
+        elif self.table.page_range_list[-1].has_capacity() == False:
+            self.table.new_page_range()
+        values = []
+        for i in range(0, len(columns)):
+            values.append(columns[i])
+        rid = self.table.page_range_list[-1].b_write(values)
+        # Anna:
+        # Insert RID & Primary Key into Indexing
         pass
+
+        
 
     """
     # Read a record with specified key
@@ -43,7 +54,29 @@ class Query:
     """
 
     def select(self, index_key, column, query_columns):
-        pass
+        rid = self.table.page_directory[index_key]
+        [Page_Range,Page,Row,IsBasePage] = self.table.directory(rid)
+        return_list = []
+        for i in range(num_columns):
+            if query_columns[i] == 1:
+                return_list.append(self.table.page_range_list[Page_Range].b_read(Page,Row,i))
+        return return_list
+        # Zhetan
+        '''
+        #nesting dictionary version
+        rid_list = self.table.page_directory[column][index_key]
+        #2D array with all return records
+        return_list = []
+        for rid in rid_list
+            temp_list = []
+            [Page_Range,Page,Row,IsBasePage] = self.table.directory(rid)
+            for i in range(num_columns):
+                if query_columns[i] == 1:
+                    temp_list.append(self.table.page_range_list[Page_Range].b_read(Page,Row,i))
+            return_list.append(temp_list)
+        return return_list
+        '''
+        
     """
     # Update a record with specified key and columns
     # Returns True if update is succesful
@@ -51,6 +84,7 @@ class Query:
     """
 
     def update(self, primary_key, *columns):
+        # Mingrui:
         pass
 
     """
@@ -63,7 +97,22 @@ class Query:
     """
 
     def sum(self, start_range, end_range, aggregate_column_index):
-        pass
+        return_sum = 0
+        for i in range(start_range,end_range):
+            rid = self.table.page_directory[i]
+            [Page_Range,Page,Row,IsBasePage] = self.table.directory(rid)
+            sum += self.table.Page_Range_list[Page_Range].b_read(Page,Row,aggregate_column_index)
+        return return_sum
+    
+    '''
+        return_sum = 0
+        for i in range(start_range,end_range):
+            #note: primary key cannot repeat, rid_list is a length 1 list
+            rid_list = self.table.page_directory[self.table.key][i]
+            [Page_Range,Page,Row,IsBasePage] = self.table.directory(rid_list[0])
+            sum += self.table.Page_Range_list[Page_Range].b_read(Page,Row,aggregate_column_index)
+        return return_sum
+    '''  
 
     """
     incremenets one column of the record
