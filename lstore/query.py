@@ -1,6 +1,6 @@
 from lstore.table import Table, Record
 from lstore.index import Index
-
+from lstore.page import Page
 
 class Query:
     """
@@ -29,9 +29,43 @@ class Query:
     # Returns False if insert fails for whatever reason
     """
 
-    def insert(self, *columns):
-        schema_encoding = '0' * self.table.num_columns
-        pass
+   def insert(self, *columns):
+        #check whether need add new page range
+        if len(self.table.page_range)==0:
+            self.table.new_page_range()
+        elif self.table.page_range_list[-1].has_capacity() == False:
+            self.table.new_page_range()
+        #check whether need add new base page
+        if len(self.table.page_range.base_page)==0:
+            self.table.page_range_list[-1].new_base_page()
+        elif self.table.page_range_list[-1].base_page[-1].has_capacity() == False:
+            self.table.page_range_list[-1].new_base_page()
+        
+        #Write valule into physical location
+        for i in range(num_columns):
+            rid = self.table.page_range_list[-1].b_write(columns[i])
+        #Plug value into directory
+        #Only have primary key correspond to rid
+        self.table.page_directory[columns[self.key]] = rid
+            
+        '''
+        #check whether need initialized directory
+        if len(self.table.page_directory)==0:
+            for i in range(num_columns):
+                self.table.page_directory[i] = {}
+                
+        #Write valule into physical location
+        #Plug value into directory nesting dictionary
+        for i in range(num_columns):
+            rid = self.table.page_range_list[-1].b_write(columns[i])
+            if columns[i] not in self.table.page_directory[i]:
+                self.table.page_directory[i][columns[i]] = [rid]
+            else:
+                self.table.page_directory[i][columns[i]].append(rid)
+        '''
+        
+        Schema_Encoding = '0' * self.table.num_columns
+        
 
     """
     # Read a record with specified key
@@ -43,7 +77,29 @@ class Query:
     """
 
     def select(self, index_key, column, query_columns):
-        pass
+        rid = self.table.page_directory[index_key]
+        [Page_Range,Page,Row,IsBasePage] = self.table.directory(rid)
+        return_list = []
+        for i in range(num_columns):
+            if query_columns[i] == 1:
+                return_list.append(self.table.page_range_list[Page_Range].b_read(Page,Row,i))
+        return return_list
+        
+        '''
+        #nesting dictionary version
+        rid_list = self.table.page_directory[column][index_key]
+        #2D array with all return records
+        return_list = []
+        for rid in rid_list
+            temp_list = []
+            [Page_Range,Page,Row,IsBasePage] = self.table.directory(rid)
+            for i in range(num_columns):
+                if query_columns[i] == 1:
+                    temp_list.append(self.table.page_range_list[Page_Range].b_read(Page,Row,i))
+            return_list.append(temp_list)
+        return return_list
+        '''
+        
     """
     # Update a record with specified key and columns
     # Returns True if update is succesful
@@ -63,7 +119,22 @@ class Query:
     """
 
     def sum(self, start_range, end_range, aggregate_column_index):
-        pass
+        return_sum = 0
+        for i in range(start_range,end_range):
+            rid = self.table.page_directory[i]
+            [Page_Range,Page,Row,IsBasePage] = self.table.directory(rid)
+            sum += self.table.Page_Range_list[Page_Range].b_read(Page,Row,aggregate_column_index)
+        return return_sum
+    
+    '''
+        return_sum = 0
+        for i in range(start_range,end_range):
+            #note: primary key cannot repeat, rid_list is a length 1 list
+            rid_list = self.table.page_directory[self.table.key][i]
+            [Page_Range,Page,Row,IsBasePage] = self.table.directory(rid_list[0])
+            sum += self.table.Page_Range_list[Page_Range].b_read(Page,Row,aggregate_column_index)
+        return return_sum
+    '''  
 
     """
     incremenets one column of the record
