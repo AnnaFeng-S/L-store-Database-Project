@@ -58,7 +58,7 @@ class Table:
         pass
  
     def new_page_range(self):
-        print("New Page Range")
+        #print("New Page Range")
         self.page_range_list.append(Page_Range(self.num_columns, self.rid, (self.rid+16*512)))
         self.rid += 80*512
         pass

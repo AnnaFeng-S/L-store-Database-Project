@@ -22,7 +22,9 @@ class Query:
     """
 
     def delete(self, primary_key):
-        pass
+        rid = self.table.index.locate(0, primary_key)
+        [Page_Range,Page,Row,IsBasePage] = self.table.directory(rid)
+        self.table.page_range_list[Page_Range].b_delete(Page,Row)
     """
     # Insert a record with specified columns
     # Return True upon succesful insertion
@@ -38,11 +40,8 @@ class Query:
         for i in range(0, len(columns)):
             values.append(columns[i])
         rid = self.table.page_range_list[-1].b_write(values)
-        # Anna:
-        # Insert RID & Primary Key into Indexing
-        pass
+        self.table.index.insert(self.table.key, columns[0], rid)
 
-        
 
     """
     # Read a record with specified key
@@ -54,28 +53,18 @@ class Query:
     """
 
     def select(self, index_key, column, query_columns):
-        rid = self.table.page_directory[index_key]
+        rid = self.table.index.locate(column, index_key)
         [Page_Range,Page,Row,IsBasePage] = self.table.directory(rid)
+        record = self.table.page_range_list[Page_Range].b_read(Page,Row)
+        if record is None:
+            return False
         return_list = []
-        for i in range(num_columns):
+        record_list = []
+        for i in range(self.table.num_columns):
             if query_columns[i] == 1:
-                return_list.append(self.table.page_range_list[Page_Range].b_read(Page,Row,i))
+                record_list.append(record[i])
+        return_list.append(Record(rid, 0, record_list))
         return return_list
-        # Zhetan
-        '''
-        #nesting dictionary version
-        rid_list = self.table.page_directory[column][index_key]
-        #2D array with all return records
-        return_list = []
-        for rid in rid_list
-            temp_list = []
-            [Page_Range,Page,Row,IsBasePage] = self.table.directory(rid)
-            for i in range(num_columns):
-                if query_columns[i] == 1:
-                    temp_list.append(self.table.page_range_list[Page_Range].b_read(Page,Row,i))
-            return_list.append(temp_list)
-        return return_list
-        '''
         
     """
     # Update a record with specified key and columns
@@ -84,8 +73,9 @@ class Query:
     """
 
     def update(self, primary_key, *columns):
-        # Mingrui:
-        pass
+        rid = self.table.index.locate(0, primary_key)
+        [Page_Range,Page,Row,IsBasePage] = self.table.directory(rid)
+        self.table.page_range_list[Page_Range].t_update(Page,Row,columns)
 
     """
     :param start_range: int         # Start of the key range to aggregate 
@@ -98,10 +88,11 @@ class Query:
 
     def sum(self, start_range, end_range, aggregate_column_index):
         return_sum = 0
-        for i in range(start_range,end_range):
-            rid = self.table.page_directory[i]
-            [Page_Range,Page,Row,IsBasePage] = self.table.directory(rid)
-            sum += self.table.Page_Range_list[Page_Range].b_read(Page,Row,aggregate_column_index)
+        rids = self.table.index.locate_range(start_range, end_range, 0)
+        for i in rids:
+            [Page_Range,Page,Row,IsBasePage] = self.table.directory(i)
+            record = self.table.page_range_list[Page_Range].b_read(Page,Row)
+            return_sum += record[aggregate_column_index]
         return return_sum
     
     '''

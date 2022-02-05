@@ -42,7 +42,7 @@ class Page_Range:
         
     def b_write(self, value):
         if (self.next_brid%512 == 0):
-            print("New Base Page")
+            #print("New Base Page")
             self.new_base_page()
         record = []
         record.append(self.getNextRID())
@@ -55,14 +55,16 @@ class Page_Range:
 
     def b_read(self, page_index, index):
         record = []
+        if self.b_read_col(page_index, index, 1) == 2:
+            return None
         if self.b_read_col(page_index, index, 1) == 0:
-            for i in range(0, self.n_columns):
+            for i in range(4, self.n_columns):
                 record.append(self.b_read_col(page_index, index, i))
         else:
             new_loc = self.b_read_col(page_index, index, 2)
             new_page_index = int((new_loc-self.ini_trid)/512)
             new_index = int((new_loc-self.ini_trid)%512)
-            for i in range(0, self.n_columns):
+            for i in range(4, self.n_columns):
                 record.append(self.t_read_col(new_page_index, new_index, i))
         return record
     
@@ -75,7 +77,7 @@ class Page_Range:
     def t_read_col(self, page_index, index, column):
         return self.tail_page[page_index].read(index, column)
 
-    def t_update(self, page_index, index, column, value):
+    def t_update(self, page_index, index, values):
         if ((self.next_trid-self.ini_trid)%512 == 0):
             self.new_tail_page()
         new_record = []
@@ -92,14 +94,17 @@ class Page_Range:
             new_index = int((new_loc-self.ini_trid)%512)
         new_record.append(int(round(datetime.datetime.now().timestamp())))
         for i in range(4, self.n_columns):
-            if i == column+4:
-                new_record.append(value)
-            else:
+            if values[i-4] == None:
                 if(self.b_read_col(page_index, index, 1) == 0):
                     new_record.append(self.b_read_col(page_index, index, i))
                 else:
                     new_record.append(self.t_read_col(new_page_index, new_index, i))
+            else:
+                new_record.append(values[i-4])
         self.tail_page[self.next_tpage-1].write(new_record)
         self.b_update(page_index, index, 1, 1)
         self.b_update(page_index, index, 2, new_record[0])
         
+    def b_delete(self, page_index, index):
+        self.b_update(page_index, index, 1, 2)
+        pass
