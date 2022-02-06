@@ -22,7 +22,7 @@ class Query:
     """
 
     def delete(self, primary_key):
-        rid = self.table.index.locate(0, primary_key)
+        rid = self.table.index.locate(0, primary_key)[0]
         [Page_Range,Page,Row,IsBasePage] = self.table.directory(rid)
         self.table.page_range_list[Page_Range].b_delete(Page,Row)
     """
@@ -53,17 +53,18 @@ class Query:
     """
 
     def select(self, index_key, column, query_columns):
-        rid = self.table.index.locate(column, index_key)
-        [Page_Range,Page,Row,IsBasePage] = self.table.directory(rid)
-        record = self.table.page_range_list[Page_Range].b_read(Page,Row)
-        if record is None:
-            return False
+        rids = self.table.index.locate(column, index_key)
         return_list = []
-        record_list = []
-        for i in range(self.table.num_columns):
-            if query_columns[i] == 1:
-                record_list.append(record[i])
-        return_list.append(Record(rid, 0, record_list))
+        for rid in rids:
+            [Page_Range,Page,Row,IsBasePage] = self.table.directory(rid)
+            record = self.table.page_range_list[Page_Range].b_read(Page,Row)
+            if record is None:
+                continue
+            columns = []
+            for i in range(self.table.num_columns):
+                if query_columns[i] == 1:
+                    columns.append(record[i])
+            return_list.append(Record(rid, 0, columns))
         return return_list
         
     """
@@ -73,7 +74,7 @@ class Query:
     """
 
     def update(self, primary_key, *columns):
-        rid = self.table.index.locate(0, primary_key)
+        rid = self.table.index.locate(0, primary_key)[0]
         [Page_Range,Page,Row,IsBasePage] = self.table.directory(rid)
         self.table.page_range_list[Page_Range].t_update(Page,Row,columns)
 
@@ -89,21 +90,12 @@ class Query:
     def sum(self, start_range, end_range, aggregate_column_index):
         return_sum = 0
         rids = self.table.index.locate_range(start_range, end_range, 0)
-        for i in rids:
-            [Page_Range,Page,Row,IsBasePage] = self.table.directory(i)
+        for rid in rids:
+            [Page_Range,Page,Row,IsBasePage] = self.table.directory(rid)
             record = self.table.page_range_list[Page_Range].b_read(Page,Row)
             return_sum += record[aggregate_column_index]
         return return_sum
-    
-    '''
-        return_sum = 0
-        for i in range(start_range,end_range):
-            #note: primary key cannot repeat, rid_list is a length 1 list
-            rid_list = self.table.page_directory[self.table.key][i]
-            [Page_Range,Page,Row,IsBasePage] = self.table.directory(rid_list[0])
-            sum += self.table.Page_Range_list[Page_Range].b_read(Page,Row,aggregate_column_index)
-        return return_sum
-    '''  
+
 
     """
     incremenets one column of the record

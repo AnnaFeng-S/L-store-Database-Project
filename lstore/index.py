@@ -33,7 +33,7 @@ class Index:
         rids = []
         for k in range(begin, end+1):
             if k in col_dict.keys():
-                rids.append(col_dict[k])
+                rids += col_dict[k]
         return rids
         
 
@@ -57,7 +57,10 @@ class Index:
     def insert(self, column, value, rid):
         col_dict = self.indices[column]
         if col_dict is not None:
-            col_dict[value] = rid
+            if value in col_dict.keys():
+                col_dict[value].append(rid)
+            else:
+                col_dict[value] = [rid]
 
 
     """ 
@@ -66,7 +69,10 @@ class Index:
     def delete(self, column, value, rid):
         col_dict = self.indices[column]
         if value in col_dict.keys():
-            del col_dict[value]
+            if len(col_dict[value]) == 1:
+                del col_dict[value]
+            else:
+                col_dict[value].remove(rid)
 
     """ 
     # Update record with this
