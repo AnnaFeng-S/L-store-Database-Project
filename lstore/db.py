@@ -30,10 +30,10 @@ class Database():
     # Deletes the specified table
     """
     def drop_table(self, name):
-        pass
+        tables.remove(name)
 
     """
     # Returns table with the passed name
     """
     def get_table(self, name):
-        pass
+        return self.tables[name]
