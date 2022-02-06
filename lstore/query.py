@@ -23,7 +23,7 @@ class Query:
 
     def delete(self, primary_key):
         rid = self.table.index.locate(0, primary_key)[0]
-        [Page_Range,Page,Row,IsBasePage] = self.table.directory(rid)
+        [Page_Range,Page,Row] = self.table.directory[rid]
         self.table.page_range_list[Page_Range].b_delete(Page,Row)
     """
     # Insert a record with specified columns
@@ -39,8 +39,10 @@ class Query:
         values = []
         for i in range(0, len(columns)):
             values.append(columns[i])
-        rid = self.table.page_range_list[-1].b_write(values)
+        [rid, page_index, index] = self.table.page_range_list[-1].b_write(values)
         self.table.index.insert(self.table.key, columns[0], rid)
+        self.table.directory[rid] = [len(self.table.page_range_list)-1, page_index, index]
+
 
 
     """
@@ -56,7 +58,7 @@ class Query:
         rids = self.table.index.locate(column, index_key)
         return_list = []
         for rid in rids:
-            [Page_Range,Page,Row,IsBasePage] = self.table.directory(rid)
+            [Page_Range,Page,Row] = self.table.directory[rid]
             record = self.table.page_range_list[Page_Range].b_read(Page,Row)
             if record is None:
                 continue
@@ -75,7 +77,9 @@ class Query:
 
     def update(self, primary_key, *columns):
         rid = self.table.index.locate(0, primary_key)[0]
-        [Page_Range,Page,Row,IsBasePage] = self.table.directory(rid)
+        [Page_Range,Page,Row] = self.table.directory[rid]
+        if(self.table.page_range_list[Page_Range].tail_has_capacity() == False):
+            self.table.new_tail_page(Page_Range)
         self.table.page_range_list[Page_Range].t_update(Page,Row,columns)
 
     """
@@ -91,7 +95,7 @@ class Query:
         return_sum = 0
         rids = self.table.index.locate_range(start_range, end_range, 0)
         for rid in rids:
-            [Page_Range,Page,Row,IsBasePage] = self.table.directory(rid)
+            [Page_Range,Page,Row] = self.table.directory[rid]
             record = self.table.page_range_list[Page_Range].b_read(Page,Row)
             return_sum += record[aggregate_column_index]
         return return_sum

@@ -9,9 +9,6 @@ RID_COLUMN = 1
 TIMESTAMP_COLUMN = 2
 SCHEMA_ENCODING_COLUMN = 3
 
-MAX_PAGE_RANGE = 80*512
-MAX_BASE_PAGE = 16*512
-MAX_PAGE = 512
 
 class Record:
 
@@ -31,27 +28,11 @@ class Table:
         self.name = name
         self.key = key
         self.num_columns = num_columns
-        self.page_directory = {}
+        self.directory = {}
         self.index = Index(self)
-        self.rid = 0
         self.page_range_list = []
-        pass
-    """
-    Return [Page_Range, Page, Row, IsBasePage]
-    All begin from 0
-    IsBasePage is a 1 bit boolean value
-    """
-    def directory(self, rid):
-        Page_Range = math.floor(rid/MAX_PAGE_RANGE)
-        if (rid % MAX_PAGE_RANGE)<MAX_BASE_PAGE:
-            IsBasePage = 1
-            Page = math.floor((rid % MAX_PAGE_RANGE)/MAX_PAGE)
-        else:
-            IsBasePagege = 0
-            Page = math.floor((rid % MAX_PAGE_RANGE)/MAX_PAGE)-16
-        Row = rid % MAX_PAGE
-        return [Page_Range,Page,Row,IsBasePage]
-    
+        self.rid = 0
+        pass    
 
     def __merge(self):
         print("merge is happening")
@@ -62,3 +43,8 @@ class Table:
         self.page_range_list.append(Page_Range(self.num_columns, self.rid, (self.rid+16*512)))
         self.rid += 80*512
         pass
+
+    def new_tail_page(self, page_range):
+        self.page_range_list[page_range].more_tail_page(self.rid)
+        self.rid += 64*512
+

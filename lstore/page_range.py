@@ -5,15 +5,21 @@ class Page_Range:
     def __init__(self, num_columns, brid, trid):
         self.base_page = []
         self.tail_page = []
-        self.n_columns = num_columns+4
-        self.ini_trid = trid
+        self.n_columns = num_columns + 4
         self.next_bpage = 0
         self.next_tpage = 0
         self.next_brid = brid
         self.next_trid = trid
+        self.trid_list = [trid]
 
     def has_capacity(self):
         if len(self.base_page) == 16 and not(self.base_page[15].has_capacity()):
+            return False
+        else:
+            return True
+    
+    def tail_has_capacity(self):
+        if (self.next_tpage != 0) and (len(self.tail_page) % 64 == 0) and not(self.tail_page[len(self.tail_page)-1].has_capacity()):
             return False
         else:
             return True
@@ -26,11 +32,13 @@ class Page_Range:
             return False
     
     def new_tail_page(self):
-        if len(self.tail_page) < 64:
-            self.tail_page.append(Tail_Page(self.n_columns))
-            self.next_tpage += 1
-        else:
-            return False
+        self.tail_page.append(Tail_Page(self.n_columns))
+        self.next_tpage += 1
+        
+
+    def more_tail_page(self, new_trid):
+        self.next_trid = new_trid
+        self.trid_list.append(new_trid)
 
     def getNextRID(self):
         self.next_brid += 1
@@ -42,7 +50,6 @@ class Page_Range:
         
     def b_write(self, value):
         if (self.next_brid%512 == 0):
-            #print("New Base Page")
             self.new_base_page()
         record = []
         record.append(self.getNextRID())
@@ -51,7 +58,20 @@ class Page_Range:
         record.append(int(round(datetime.datetime.now().timestamp())))
         record = record + value
         self.base_page[self.next_bpage-1].write(record)
-        return record[0]
+        loc_info = [record[0]]
+        loc_info.append(self.next_bpage-1)
+        loc_info.append((int(self.next_brid-1) % 512))
+        return loc_info
+
+    def t_locate(self, trid):
+        page_block = 0
+        for i in range(0, len(self.trid_list)):
+            if trid - self.trid_list[i] < 64*512:
+                page_block = i
+                break
+        page_index = int((trid-self.trid_list[page_block])/512) + 64*page_block
+        index = int((trid-self.trid_list[page_block])%512)
+        return [page_index, index]
 
     def b_read(self, page_index, index):
         record = []
@@ -62,8 +82,7 @@ class Page_Range:
                 record.append(self.b_read_col(page_index, index, i))
         else:
             new_loc = self.b_read_col(page_index, index, 2)
-            new_page_index = int((new_loc-self.ini_trid)/512)
-            new_index = int((new_loc-self.ini_trid)%512)
+            [new_page_index, new_index] = self.t_locate(new_loc)
             for i in range(4, self.n_columns):
                 record.append(self.t_read_col(new_page_index, new_index, i))
         return record
@@ -78,7 +97,7 @@ class Page_Range:
         return self.tail_page[page_index].read(index, column)
 
     def t_update(self, page_index, index, values):
-        if ((self.next_trid-self.ini_trid)%512 == 0):
+        if ((self.next_trid-self.trid_list[len(self.trid_list)-1])%512 == 0):
             self.new_tail_page()
         new_record = []
         new_record.append(self.getNextTRID())
@@ -89,9 +108,10 @@ class Page_Range:
             new_record.append(self.b_read_col(page_index, index, 0))
         else:
             new_record.append(self.b_read_col(page_index, index, 2))
-            new_loc = self.b_read_col(page_index, index, 2)
-            new_page_index = int((new_loc-self.ini_trid)/512)
-            new_index = int((new_loc-self.ini_trid)%512)
+            new_rid = self.b_read_col(page_index, index, 2)
+            new_loc = self.t_locate(new_rid)
+            new_page_index = new_loc[0]
+            new_index = new_loc[1]
         new_record.append(int(round(datetime.datetime.now().timestamp())))
         for i in range(4, self.n_columns):
             if values[i-4] == None:
