@@ -9,7 +9,6 @@ class Base_Page:
     def has_capacity(self):
         return self.base_page[0].has_capacity()
 
-    # write a list of values to the page
     def write(self, values):
         for i in range (0, len(self.base_page)):
             self.base_page[i].write(values[i])

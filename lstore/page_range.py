@@ -1,5 +1,7 @@
 from lstore.bt_page import Base_Page, Tail_Page
-import datetime
+import time
+
+SPECIAL_RID = -(2**63)
 
 class Page_Range:
     def __init__(self, num_columns, brid, trid):
@@ -35,7 +37,6 @@ class Page_Range:
         self.tail_page.append(Tail_Page(self.n_columns))
         self.next_tpage += 1
         
-
     def more_tail_page(self, new_trid):
         self.next_trid = new_trid
         self.trid_list.append(new_trid)
@@ -55,12 +56,10 @@ class Page_Range:
         record.append(self.getNextRID())
         record.append(0)
         record.append(record[0])
-        record.append(int(round(datetime.datetime.now().timestamp())))
+        record.append(int(time.time()))
         record = record + value
         self.base_page[self.next_bpage-1].write(record)
-        loc_info = [record[0]]
-        loc_info.append(self.next_bpage-1)
-        loc_info.append((int(self.next_brid-1) % 512))
+        loc_info = [record[0], self.next_bpage - 1, (int(self.next_brid-1) % 512)]
         return loc_info
 
     def t_locate(self, trid):
@@ -75,8 +74,6 @@ class Page_Range:
 
     def b_read(self, page_index, index):
         record = []
-        if self.b_read_col(page_index, index, 1) == 2:
-            return None
         if self.b_read_col(page_index, index, 1) == 0:
             for i in range(4, self.n_columns):
                 record.append(self.b_read_col(page_index, index, i))
@@ -90,6 +87,9 @@ class Page_Range:
     def b_update(self, page_index, index, column, value):
         self.base_page[page_index].update(index, column, value)
 
+    def t_update_col(self, page_index, index, column, value):
+        self.tail_page[page_index].update(index, column, value)
+
     def b_read_col(self, page_index, index, column):
         return self.base_page[page_index].read(index, column)
 
@@ -102,29 +102,33 @@ class Page_Range:
         new_record = []
         new_record.append(self.getNextTRID())
         new_record.append(0)
-        new_index = index
-        new_page_index = page_index
         if(self.b_read_col(page_index, index, 1) == 0):
             new_record.append(self.b_read_col(page_index, index, 0))
-        else:
-            new_record.append(self.b_read_col(page_index, index, 2))
-            new_rid = self.b_read_col(page_index, index, 2)
-            new_loc = self.t_locate(new_rid)
-            new_page_index = new_loc[0]
-            new_index = new_loc[1]
-        new_record.append(int(round(datetime.datetime.now().timestamp())))
-        for i in range(4, self.n_columns):
-            if values[i-4] == None:
-                if(self.b_read_col(page_index, index, 1) == 0):
+            new_record.append(int(time.time()))
+            for i in range(4, self.n_columns):
+                if values[i-4] == None:
                     new_record.append(self.b_read_col(page_index, index, i))
                 else:
+                    new_record.append(values[i-4])
+        else:
+            new_record.append(self.b_read_col(page_index, index, 2))
+            new_record.append(int(time.time()))
+            new_rid = self.b_read_col(page_index, index, 2)
+            [new_page_index, new_index] = self.t_locate(new_rid)
+            for i in range(4, self.n_columns):
+                if values[i-4] == None:
                     new_record.append(self.t_read_col(new_page_index, new_index, i))
-            else:
-                new_record.append(values[i-4])
+                else:
+                    new_record.append(values[i-4])
         self.tail_page[self.next_tpage-1].write(new_record)
         self.b_update(page_index, index, 1, 1)
         self.b_update(page_index, index, 2, new_record[0])
         
     def b_delete(self, page_index, index):
-        self.b_update(page_index, index, 1, 2)
-        pass
+        ori_rid = self.b_read_col(page_index, index, 0)
+        self.b_update(page_index, index, 0, SPECIAL_RID)
+        indirection = self.b_read_col(page_index, index, 2)
+        while indirection != ori_rid:
+            [new_page_index, new_index] = self.t_locate(indirection)
+            self.t_update_col(new_page_index, new_index, 0, SPECIAL_RID)
+            indirection = self.t_read_col(new_page_index, new_index, 2)

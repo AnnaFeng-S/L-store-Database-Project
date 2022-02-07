@@ -4,10 +4,11 @@ from lstore.page import Page
 from lstore.page_range import Page_Range
 import math
 
-INDIRECTION_COLUMN = 0
-RID_COLUMN = 1
-TIMESTAMP_COLUMN = 2
-SCHEMA_ENCODING_COLUMN = 3
+
+RID_COLUMN = 0
+SCHEMA_ENCODING_COLUMN = 1
+INDIRECTION_COLUMN = 2
+TIMESTAMP_COLUMN = 3
 
 
 class Record:
