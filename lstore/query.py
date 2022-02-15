@@ -22,9 +22,15 @@ class Query:
     """
 
     def delete(self, primary_key):
-        rid = self.table.index.locate(0, primary_key)[0]
-        [Page_Range,Page,Row,IsBasePage] = self.table.directory(rid)
+        rids = self.table.index.locate(0, primary_key)
+        if rids is None:
+            return False
+        rid = rids[0]
+        [Page_Range,Page,Row] = self.table.directory[rid]
         self.table.page_range_list[Page_Range].b_delete(Page,Row)
+        self.table.index.delete(self.table.key, primary_key, rid)
+        self.table.directory.pop(rid)
+        return True
     """
     # Insert a record with specified columns
     # Return True upon succesful insertion
@@ -32,15 +38,15 @@ class Query:
     """
 
     def insert(self, *columns):
-        if len(self.table.page_range_list)==0:
+        if self.table.rid == 0:
             self.table.new_page_range()
         elif self.table.page_range_list[-1].has_capacity() == False:
             self.table.new_page_range()
-        values = []
-        for i in range(0, len(columns)):
-            values.append(columns[i])
-        rid = self.table.page_range_list[-1].b_write(values)
+        [rid, page_index, index] = self.table.page_range_list[-1].b_write(columns)
         self.table.index.insert(self.table.key, columns[0], rid)
+        self.table.directory[rid] = [len(self.table.page_range_list)-1, page_index, index]
+        return True
+
 
 
     """
@@ -56,14 +62,14 @@ class Query:
         rids = self.table.index.locate(column, index_key)
         return_list = []
         for rid in rids:
-            [Page_Range,Page,Row,IsBasePage] = self.table.directory(rid)
+            [Page_Range,Page,Row] = self.table.directory[rid]
             record = self.table.page_range_list[Page_Range].b_read(Page,Row)
-            if record is None:
-                continue
             columns = []
             for i in range(self.table.num_columns):
                 if query_columns[i] == 1:
                     columns.append(record[i])
+                else:
+                    columns.append(None)
             return_list.append(Record(rid, 0, columns))
         return return_list
         
@@ -74,9 +80,15 @@ class Query:
     """
 
     def update(self, primary_key, *columns):
-        rid = self.table.index.locate(0, primary_key)[0]
-        [Page_Range,Page,Row,IsBasePage] = self.table.directory(rid)
+        rids = self.table.index.locate(0, primary_key)
+        if rids is None:
+            return False
+        rid = rids[0]
+        [Page_Range,Page,Row] = self.table.directory[rid]
+        if(self.table.page_range_list[Page_Range].tail_has_capacity() == False):
+            self.table.new_tail_page(Page_Range)
         self.table.page_range_list[Page_Range].t_update(Page,Row,columns)
+        return True
 
     """
     :param start_range: int         # Start of the key range to aggregate 
@@ -88,10 +100,12 @@ class Query:
     """
 
     def sum(self, start_range, end_range, aggregate_column_index):
+        rids = self.table.index.locate_range(start_range, end_range, self.table.key)
+        if rids is None:
+            return False
         return_sum = 0
-        rids = self.table.index.locate_range(start_range, end_range, 0)
         for rid in rids:
-            [Page_Range,Page,Row,IsBasePage] = self.table.directory(rid)
+            [Page_Range,Page,Row] = self.table.directory[rid]
             record = self.table.page_range_list[Page_Range].b_read(Page,Row)
             return_sum += record[aggregate_column_index]
         return return_sum
