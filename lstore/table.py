@@ -20,6 +20,7 @@ class Record:
         self.rid = rid
         self.key = key
         self.columns = columns
+        
 
 class Table:
 
@@ -36,7 +37,7 @@ class Table:
         self.index = Index(self)
         self.page_range_list = []
         self.rid = 0
-        pass    
+        pass
 
     def __merge(self):
         print("merge is happening")

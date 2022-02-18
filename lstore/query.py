@@ -1,6 +1,8 @@
 from lstore.table import Table, Record
 from lstore.index import Index
 from lstore.page import Page
+from lstore.db import Database, bufferpool_page_range, BufferPool
+import pickle
 
 class Query:
     """
@@ -12,6 +14,7 @@ class Query:
 
     def __init__(self, table):
         self.table = table
+        self.BufferPool = BufferPool()
         pass
 
     """
@@ -45,8 +48,10 @@ class Query:
         [rid, page_index, index] = self.table.page_range_list[-1].b_write(columns)
         self.table.index.insert(self.table.key, columns[0], rid)
         self.table.directory[rid] = [len(self.table.page_range_list)-1, page_index, index]
+        
+        #test
+        self.BufferPool.write_data(self.table.name,self.table)
         return True
-
 
 
     """
@@ -63,7 +68,27 @@ class Query:
         return_list = []
         for rid in rids:
             [Page_Range,Page,Row] = self.table.directory[rid]
-            record = self.table.page_range_list[Page_Range].b_read(Page,Row)
+            if Page_Range in self.BufferPool.bufferpool_list:
+                temp_page_range = self.BufferPool.bufferpool[self.BufferPool.bufferpool_list.index(Page_Range)].page_range
+                self.BufferPool.bufferpool[self.BufferPool.bufferpool_list.index(Page_Range)].used_time += 1
+            elif len(self.BufferPool.bufferpool_list)<3:
+                self.BufferPool.bufferpool_list.append(Page_Range)
+                temp_table = self.BufferPool.load_data(self.table.name)
+                temp_page_range = temp_table.page_range_list[Page_Range]
+                self.BufferPool.bufferpool.append(bufferpool_page_range(temp_page_range))
+            else:
+                temp_index = self.BufferPool.min_used_time()
+                if self.BufferPool.bufferpool[temp_index].dirty == 1:
+                    temp_table = self.BufferPool.load_data(self.table.name)
+                    temp_Page_Range = self.BufferPool.bufferpool_list[temp_index]
+                    temp_table.page_range_list[temp_Page_Range]= self.BufferPool.bufferpool[temp_index]
+                    self.BufferPool.write_data(self.table.name,temp_table)
+                self.BufferPool.bufferpool_list[temp_index] = Page_Range
+                temp_table = self.BufferPool.load_data(self.table.name)
+                temp_page_range = temp_table.page_range_list[Page_Range]
+                self.BufferPool.bufferpool[temp_index] = bufferpool_page_range(temp_page_range)
+                
+            record = temp_page_range.b_read(Page,Row)
             columns = []
             for i in range(self.table.num_columns):
                 if query_columns[i] == 1:
@@ -85,9 +110,31 @@ class Query:
             return False
         rid = rids[0]
         [Page_Range,Page,Row] = self.table.directory[rid]
-        if(self.table.page_range_list[Page_Range].tail_has_capacity() == False):
-            self.table.new_tail_page(Page_Range)
-        self.table.page_range_list[Page_Range].t_update(Page,Row,columns)
+        if Page_Range in self.BufferPool.bufferpool_list:
+            temp_page_range = self.BufferPool.bufferpool[self.BufferPool.bufferpool_list.index(Page_Range)].page_range
+            self.BufferPool.bufferpool[self.BufferPool.bufferpool_list.index(Page_Range)].used_time += 1
+        elif len(self.BufferPool.bufferpool_list)<3:
+            self.BufferPool.bufferpool_list.append(Page_Range)
+            temp_table = self.BufferPool.load_data(self.table.name)
+            temp_page_range = temp_table.page_range_list[Page_Range]
+            self.BufferPool.bufferpool.append(bufferpool_page_range(temp_page_range))
+        else:
+            temp_index = self.BufferPool.min_used_time()
+            if self.BufferPool.bufferpool[temp_index].dirty == 1:
+                temp_table = self.BufferPool.load_data(self.table.name)
+                temp_Page_Range = self.BufferPool.bufferpool_list[temp_index]
+                temp_table.page_range_list[temp_Page_Range]= self.BufferPool.bufferpool[temp_index]
+                self.BufferPool.write_data(self.table.name,temp_table)
+            self.BufferPool.bufferpool_list[temp_index] = Page_Range
+            temp_table = self.BufferPool.load_data(self.table.name)
+            temp_page_range = temp_table.page_range_list[Page_Range]
+            self.BufferPool.bufferpool[temp_index] = bufferpool_page_range(temp_page_range)
+        
+        self.BufferPool.bufferpool[self.BufferPool.bufferpool_list.index(Page_Range)].dirty = 1
+        if(temp_page_range.tail_has_capacity() == False):
+            temp_page_range.new_tail_page(self.table.rid)
+            self.rid += 64*512
+        temp_page_range.t_update(Page,Row,columns)
         return True
 
     """
@@ -106,7 +153,26 @@ class Query:
         return_sum = 0
         for rid in rids:
             [Page_Range,Page,Row] = self.table.directory[rid]
-            record = self.table.page_range_list[Page_Range].b_read(Page,Row)
+            if Page_Range in self.BufferPool.bufferpool_list:
+                temp_page_range = self.BufferPool.bufferpool[self.BufferPool.bufferpool_list.index(Page_Range)].page_range
+                self.BufferPool.bufferpool[self.BufferPool.bufferpool_list.index(Page_Range)].used_time += 1
+            elif len(self.BufferPool.bufferpool_list)<3:
+                self.BufferPool.bufferpool_list.append(Page_Range)
+                temp_table = self.BufferPool.load_data(self.table.name)
+                temp_page_range = temp_table.page_range_list[Page_Range]
+                self.BufferPool.bufferpool.append(bufferpool_page_range(temp_page_range))
+            else:
+                temp_index = self.BufferPool.min_used_time()
+                if self.BufferPool.bufferpool[temp_index].dirty == 1:
+                    temp_table = self.BufferPool.load_data(self.table.name)
+                    temp_Page_Range = self.BufferPool.bufferpool_list[temp_index]
+                    temp_table.page_range_list[temp_Page_Range]= self.BufferPool.bufferpool[temp_index]
+                    self.BufferPool.write_data(self.table.name,temp_table)
+                self.BufferPool.bufferpool_list[temp_index] = Page_Range
+                temp_table = self.BufferPool.load_data(self.table.name)
+                temp_page_range = temp_table.page_range_list[Page_Range]
+                self.BufferPool.bufferpool[temp_index] = bufferpool_page_range(temp_page_range)
+            record = temp_page_range.b_read(Page,Row)
             return_sum += record[aggregate_column_index]
         return return_sum
 

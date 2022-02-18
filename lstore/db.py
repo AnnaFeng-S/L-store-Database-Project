@@ -1,4 +1,39 @@
 from lstore.table import Table
+import pickle
+
+class bufferpool_page_range:
+    
+    def __init__(self, page_range):
+        self.page_range = page_range
+        self.dirty = 0
+        self.used_time = 0
+        self.pin = 0
+        
+class BufferPool:
+    
+    def __init__(self):
+        self.bufferpool = []
+        self.bufferpool_list = []
+
+    def load_data(self,table_name):
+        f = open(table_name+'.pickle','rb')
+        return_table = pickle.load(f)
+        f.close()
+        return return_table
+    
+    def write_data(self,table_name,data):
+        f = open(table_name+'.pickle','wb')
+        pickle.dump(data,f)
+        f.close()
+        
+    def min_used_time(self):
+        Min = float("inf")
+        for page in self.bufferpool:
+            if page.used_time < Min:
+                Min = page.used_time
+                return_value = self.bufferpool.index(page)
+        return return_value
+
 
 class Database():
 
@@ -14,6 +49,8 @@ class Database():
 
     def close(self):
         pass
+    
+    
 
     """
     # Creates a new table
