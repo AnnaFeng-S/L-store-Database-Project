@@ -1,12 +1,8 @@
 from lstore.bt_page import Base_Page, Tail_Page
 import time
 
-SPECIAL_RID = -(2**63)
+SPECIAL_RID = (2**64)-1
 RID_COLUMN = 0
-SCHEMA_ENCODING_COLUMN = 1
-INDIRECTION_COLUMN = 2
-TIMESTAMP_COLUMN = 3
-NUM_META = 4
 BASE_PAGE_MAX_SIZE = 16
 TAIL_BLOCK_SIZE = 64
 PHYSICAL_PAGE_SIZE = 512
@@ -15,7 +11,7 @@ class Page_Range:
     def __init__(self, num_columns, brid, trid):
         self.base_page = []
         self.tail_page = []
-        self.n_columns = num_columns + NUM_META
+        self.n_columns = num_columns
         self.next_bpage = 0
         self.next_tpage = 0
         self.next_brid = brid
@@ -61,14 +57,13 @@ class Page_Range:
         if (self.next_brid % PHYSICAL_PAGE_SIZE == 0):
             self.new_base_page()
         rid = self.getNextRID()
-        page_index = self.next_bpage-1
-        self.base_page[page_index].write_col(0, rid)
-        self.base_page[page_index].write_col(1, 0)
-        self.base_page[page_index].write_col(2, rid)
-        self.base_page[page_index].write_col(3, int(time.time()))
-        for i in range(4, self.n_columns):
-            self.base_page[page_index].write_col(i, values[i-4])
-        loc_info = [rid, page_index, rid % PHYSICAL_PAGE_SIZE]
+        self.base_page[-1].meta_data.write_RID(rid)
+        self.base_page[-1].meta_data.write_SCHEMA(0)
+        self.base_page[-1].meta_data.write_INDIRECTION(rid)
+        self.base_page[-1].meta_data.write_TIMESTAMP(int(time.time()))
+        for i in range(0, self.n_columns):
+            self.base_page[-1].write_col(i, values[i])
+        loc_info = [rid, self.next_bpage - 1, rid % PHYSICAL_PAGE_SIZE]
         return loc_info
 
     def t_locate(self, trid):
@@ -83,13 +78,13 @@ class Page_Range:
 
     def b_read(self, page_index, index):
         record = []
-        if self.b_read_col(page_index, index, SCHEMA_ENCODING_COLUMN) == 0:
-            for i in range(NUM_META, self.n_columns):
+        if self.base_page[page_index].meta_data.read_SCHEMA(index) == 0:
+            for i in range(0, self.n_columns):
                 record.append(self.b_read_col(page_index, index, i))
         else:
-            new_loc = self.b_read_col(page_index, index, INDIRECTION_COLUMN)
+            new_loc = self.base_page[page_index].meta_data.read_INDIRECTION(index)
             [new_page_index, new_index] = self.t_locate(new_loc)
-            for i in range(NUM_META, self.n_columns):
+            for i in range(0, self.n_columns):
                 record.append(self.t_read_col(new_page_index, new_index, i))
         return record
     
@@ -109,35 +104,36 @@ class Page_Range:
         if ((self.next_trid-self.trid_list[-1]) % PHYSICAL_PAGE_SIZE == 0):
             self.new_tail_page()
         new_record = []
-        new_record.append(self.getNextTRID())
-        new_record.append(0)
-        if(self.b_read_col(page_index, index, SCHEMA_ENCODING_COLUMN) == 0):
-            new_record.append(self.b_read_col(page_index, index, RID_COLUMN))
-            new_record.append(int(time.time()))
-            for i in range(NUM_META, self.n_columns):
-                if values[i-NUM_META] == None:
+        base_rid = self.base_page[page_index].meta_data.read_RID(index)
+        next_tid = self.getNextTRID()
+        self.tail_page[-1].meta_data.write_TID(next_tid)
+        self.tail_page[-1].meta_data.write_RID(base_rid)
+        self.tail_page[-1].meta_data.write_TIMESTAMP(int(time.time()))
+        if self.base_page[page_index].meta_data.read_SCHEMA(index) == 0:
+            self.tail_page[-1].meta_data.write_INDIRECTION(base_rid)
+            for i in range(0, self.n_columns):
+                if values[i] == None:
                     new_record.append(self.b_read_col(page_index, index, i))
                 else:
-                    new_record.append(values[i-NUM_META])
+                    new_record.append(values[i])
         else:
-            new_record.append(self.b_read_col(page_index, index, INDIRECTION_COLUMN))
-            new_record.append(int(time.time()))
-            new_rid = self.b_read_col(page_index, index, INDIRECTION_COLUMN)
+            new_rid = self.base_page[page_index].meta_data.read_INDIRECTION(index)
+            self.tail_page[-1].meta_data.write_INDIRECTION(new_rid)
             [new_page_index, new_index] = self.t_locate(new_rid)
-            for i in range(NUM_META, self.n_columns):
-                if values[i-NUM_META] == None:
+            for i in range(0, self.n_columns):
+                if values[i] == None:
                     new_record.append(self.t_read_col(new_page_index, new_index, i))
                 else:
-                    new_record.append(values[i-NUM_META])
+                    new_record.append(values[i])
         self.tail_page[-1].write(new_record)
-        self.b_update(page_index, index, SCHEMA_ENCODING_COLUMN, 1)
-        self.b_update(page_index, index, INDIRECTION_COLUMN, new_record[RID_COLUMN])
+        self.base_page[page_index].meta_data.update_SCHEMA(index, 1)
+        self.base_page[page_index].meta_data.update_INDIRECTION(index, next_tid)
         
     def b_delete(self, page_index, index):
-        ori_rid = self.b_read_col(page_index, index, RID_COLUMN)
-        self.b_update(page_index, index, RID_COLUMN, SPECIAL_RID)
-        indirection = self.b_read_col(page_index, index, INDIRECTION_COLUMN)
+        ori_rid = self.base_page[page_index].meta_data.read_RID(index)
+        self.base_page[page_index].meta_data.update_RID(index, SPECIAL_RID)
+        indirection = self.base_page[page_index].meta_data.read_INDIRECTION(index)
         while indirection != ori_rid:
             [new_page_index, new_index] = self.t_locate(indirection)
-            self.t_update_col(new_page_index, new_index, RID_COLUMN, SPECIAL_RID)
-            indirection = self.t_read_col(new_page_index, new_index, INDIRECTION_COLUMN)
+            self.tail_page[new_page_index].meta_data.update_TID(new_index, SPECIAL_RID)
+            indirection = self.tail_page[new_page_index].meta_data.read_INDIRECTION(new_index)
