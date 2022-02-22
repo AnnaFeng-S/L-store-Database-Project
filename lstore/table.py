@@ -29,7 +29,7 @@ class Table:
     :param num_columns: int     #Number of Columns: all columns are integer
     :param key: int             #Index of table key in columns
     """
-    def __init__(self, name, num_columns, key):
+    def __init__(self, name, num_columns, key, bufferpool):
         self.name = name
         self.key = key
         self.num_columns = num_columns
@@ -37,6 +37,7 @@ class Table:
         self.index = Index(self)
         self.page_range_list = []
         self.rid = 0
+        self.bufferpool = bufferpool
         pass
 
     def __merge(self):
