@@ -28,8 +28,21 @@ class BufferPool:
         self.path = path
         
     def memory_to_disk(self,index):
-        pass
-    
+        for b_index in range(len(self.bufferpool[index].base_page):
+            f = open(self.bufferpool_list[index][0]+"_"+self.bufferpool_list[index][1]+"_basemeta.pickle","wb")
+            pickle.dump(self.bufferpool[index].base_page[b_index].metadata,f)
+            f.close()
+            for col_index in len(self.bufferpool[index].base_page[b_index])
+                with open("page_range_"+index+"_basepage_"+b_index+"_col_"+col_index+".txt", "wb") as binary_file:
+                    binary_file.write(self.bufferpool[index].base_page[b_index].base_page[col_index].data)
+        for t_index in range(len(self.bufferpool[index].tail_page)):
+            f = open(self.bufferpool_list[index][0]+"_"+self.bufferpool_list[index][1]+"_tailmeta.pickle","wb")
+            pickle.dump(self.bufferpool[index].tail_page[t_index].metadata,f)
+            f.close()            
+            for col_index in len(self.bufferpool[index].tail_page[t_index])
+                with open("page_range_"+index+"_tailpage_"+t_index+"_col_"+col_index+".txt", "wb") as binary_file:
+                    binary_file.write(self.bufferpool[index].tail_page[t_index].tail_page[col_index].data)
+                             
     def disk_to_memory(self,table_name, page_range):
         pass
     
