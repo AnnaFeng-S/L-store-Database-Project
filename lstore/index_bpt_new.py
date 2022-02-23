@@ -5,8 +5,6 @@ Indices are usually B-Trees, but other data structures can be used as well.
 from xmlrpc.client import MAXINT
 import math
 
-from sklearn.model_selection import learning_curve
-
 class Node:
     def __init__(self, order):
         self.order = order
@@ -59,7 +57,7 @@ class BPT:
 
     def search(self, value):
         current_node = self.root
-        while(not current_node.has_leaf):
+        while(current_node.has_leaf == False):
             for i,v in enumerate(current_node.values):
                 if (value == v):
                     current_node = current_node.keys[i + 1]
@@ -72,16 +70,6 @@ class BPT:
                     break
 
         return current_node
-
-    """def find(self, value, key):
-        l = self.search(value)
-        for i, item in enumerate(l.values):
-            if item == value:
-                if key in l.keys[i]:
-                    return True
-                else:
-                    return False
-        return False"""
     
     def location(self, value):
         l = self.search(value)
@@ -150,10 +138,10 @@ class BPT:
     def delete(self, value, key):
         node_ = self.search(value)
 
-        check = False
-        for i, v in enumerate(node_.values):
-            if v == value:
-                check = True
+        temp = 0
+        for i, item in enumerate(node_.values):
+            if item == value:
+                temp = 1
 
                 if key in node_.keys[i]:
                     if len(node_.keys[i]) > 1:
@@ -169,10 +157,11 @@ class BPT:
                 else:
                     print("Value not in Key")
                     return
-        if check == False:
+        if temp == 0:
             print("Value not in Tree")
             return
 
+    # Delete an entry
     def deleteEntry(self, node_, value, key):
 
         if not node_.has_leaf:
@@ -189,6 +178,8 @@ class BPT:
             self.root = node_.keys[0]
             node_.keys[0].parent = None
             del node_
+            return
+        elif (node_.parent == None):
             return
         elif (len(node_.keys) < int(math.ceil(node_.order / 2)) and node_.has_leaf == False) or (len(node_.values) < int(math.ceil((node_.order - 1) / 2)) and node_.has_leaf == True):
 
@@ -251,7 +242,7 @@ class BPT:
                         parentNode = node_.parent
                         for i, item in enumerate(parentNode.values):
                             if item == value_:
-                                p.values[i] = ndashkm_1
+                                parentNode.values[i] = ndashkm_1
                                 break
                     else:
                         ndashpm = ndash.keys.pop(-1)
@@ -259,7 +250,7 @@ class BPT:
                         node_.keys = [ndashpm] + node_.keys
                         node_.values = [ndashkm] + node_.values
                         parentNode = node_.parent
-                        for i, item in enumerate(p.values):
+                        for i, item in enumerate(parentNode.values):
                             if item == value_:
                                 parentNode.values[i] = ndashkm
                                 break
@@ -294,16 +285,17 @@ class BPT:
                 if not parentNode.has_leaf:
                     for j in parentNode.keys:
                         j.parent = parentNode
+    
 
 
-
-record_len = 6
+"""record_len = 3
 bplustree = BPT(record_len)
 bplustree.insert(5, 1)
 bplustree.insert(5, 2)
 bplustree.delete(5, 2)
 
 bplustree.insert(6, 2)
+bplustree.insert(6, 12)
 bplustree.insert(7, 3)
 bplustree.insert(8, 4)
 bplustree.insert(9, 5)
@@ -313,6 +305,7 @@ bplustree.insert(11, 7)
 bplustree.insert(12, 8)
 bplustree.insert(12, 8)
 
+
 bplustree.delete(12, 8)
 bplustree.delete(12, 8)
 bplustree.delete(11, 7)
@@ -320,11 +313,11 @@ bplustree.delete(10, 6)
 bplustree.delete(8, 4)
 
 
-
-print(bplustree.range(6,9))
-print(bplustree.location(5))
-print(bplustree.location(7))
-print(bplustree.location(10))
+bplustree.delete(6, 2)
+bplustree.delete(6, 12)
+bplustree.delete(7, 3)
+bplustree.delete(9, 5)
+"""
 
 class Index:
     
@@ -332,7 +325,7 @@ class Index:
         # One index for each table. All our empty initially.
         self.indices = [None] *  table.num_columns
         # rid count
-        self.indices[table.key] = {}
+        self.indices[0] = BPT(15)
 
     """
     # returns the location of all records with the given value on column "column"
@@ -361,9 +354,13 @@ class Index:
     """
 
     def create_index(self, column):
-        # The maximum number of keys in a record
-        record_len = 100;
-        self.indices[column] = BPT(record_len)
+        # Already created
+        if self.indices[column]:
+            return
+        else:
+            # The maximum number of keys in a record
+            record_len = 5
+            self.indices[column] = BPT(record_len)
 
     """
     # optional: Drop index of specific column
@@ -385,7 +382,7 @@ class Index:
     """
     def delete(self, column, value, rid):
         col_dict = self.indices[column]
-        if col_dict.search(value):
+        if col_dict.location(value) != None:
             col_dict.delete(value,rid)
             
 
