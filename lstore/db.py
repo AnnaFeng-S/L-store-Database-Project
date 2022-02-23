@@ -1,4 +1,6 @@
 from lstore.table import Table
+from lstore.page_range import Page_Range
+from lstore.bt_page import Base_Page, Tail_Page
 import pickle
 import os
 
@@ -13,7 +15,7 @@ class BufferPool:
     def min_used_time(self):
         Min = float("inf")
         for page in self.bufferpool:
-            if (page.used_time < Min) and (page.pin == 0):
+            if page.used_time < Min:
                 Min = page.used_time
                 return_value = self.bufferpool.index(page)
         return return_value
@@ -26,26 +28,52 @@ class BufferPool:
         
     def set_path(self, path):
         self.path = path
-        
-    def memory_to_disk(self,index):
+
+    def memory_to_disk(self, index):
         for b_index in range(len(self.bufferpool[index].base_page)):
-            f = open(self.bufferpool_list[index][0]+"_"+self.bufferpool_list[index][1]+"_basemeta.pickle","wb")
-            pickle.dump(self.bufferpool[index].base_page[b_index].metadata,f)
+            f = open(self.bufferpool_list[index][0] + "_" + self.bufferpool_list[index][1] + "_basemeta.pickle", "wb")
+            pickle.dump(self.bufferpool[index].base_page[b_index].metadata, f)
+            os.path.join(self.path,self.bufferpool_list[index][0] + "_" + self.bufferpool_list[index][1] + "_basemeta.pickle")
             f.close()
             for col_index in range(len(self.bufferpool[index].base_page[b_index].base_page)):
-                with open("page_range_"+index+"_basepage_"+b_index+"_col_"+col_index+".txt", "wb") as binary_file:
+                with open(self.bufferpool_list[index][0]+"_"+self.bufferpool_list[index][1]+"_basepage_"+b_index+"_col_"+col_index+".txt", "wb") as binary_file:
                     binary_file.write(self.bufferpool[index].base_page[b_index].base_page[col_index].data)
+                    os.path.join(self.path,
+                                 self.bufferpool_list[index][0]+"_"+self.bufferpool_list[index][1]+"_basepage_"+b_index+"_col_"+col_index+".txt")
         for t_index in range(len(self.bufferpool[index].tail_page)):
-            f = open(self.bufferpool_list[index][0]+"_"+self.bufferpool_list[index][1]+"_tailmeta.pickle","wb")
-            pickle.dump(self.bufferpool[index].tail_page[t_index].metadata,f)
-            f.close()            
+            f = open(self.bufferpool_list[index][0] + "_" + self.bufferpool_list[index][1] + "_tailmeta.pickle", "wb")
+            pickle.dump(self.bufferpool[index].tail_page[t_index].metadata, f)
+            os.path.join(self.path,
+                         self.bufferpool_list[index][0] + "_" + self.bufferpool_list[index][1] + "_tailmeta.pickle")
+            f.close()
             for col_index in range(len(self.bufferpool[index].tail_page[t_index].tail_page)):
-                with open("page_range_"+index+"_tailpage_"+t_index+"_col_"+col_index+".txt", "wb") as binary_file:
+                with open(self.bufferpool_list[index][0]+"_"+self.bufferpool_list[index][1]+"_tailpage_"+t_index+"_col_"+col_index+".txt", "wb") as binary_file:
                     binary_file.write(self.bufferpool[index].tail_page[t_index].tail_page[col_index].data)
-    
-    def disk_to_memory(self,table_name, page_range):
-        pass
-    
+                    os.path.join(self.path,
+                                 self.bufferpool_list[index][0]+"_"+self.bufferpool_list[index][1]+"_tailpage_"+t_index+"_col_"+col_index+".txt")
+
+    def disk_to_memory(self, table_name, page_range):
+        os.chdir(self.path)
+        return_page_range = Page_Range()
+        for b_index in range(len(page_range.base_page.base_page)):
+            f = open(table_name + "_" + page_range + "_basemeta.pickle", "rb")
+            b_metadata = pickle.load(f)
+            return_page_range.base_page.meta_data.append(b_metadata)
+            f.close()
+            for col_index in range(len(page_range.base_page[b_index].base_page)):
+                f = open(table_name + "_" + page_range + "_basepage_" + b_index + "_col_" + col_index + ".txt", "rb")
+                bcols = pickle.load(f)
+                return_page_range.base_page[col_index].append(bcols)
+        for t_index in range(len(page_range.tail_page.tail_page)):
+            f = open(table_name + "_" + page_range + "_tailmeta.pickle", "rb")
+            t_metadata = pickle.load(f)
+            return_page_range.tail_page.meta_data.append(t_metadata)
+            f.close()
+            for col_index in range(len(page_range.tail_page[t_index].tail_page)):
+                f = open(table_name + "_" + page_range + "_tailpage_" + t_index + "_col_" + col_index + ".txt", "rb")
+                tcols = pickle.load(f)
+                return_page_range.tail_page[col_index].append(tcols)
+        return return_page_range
     
 
 class Database():
