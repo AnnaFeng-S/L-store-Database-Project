@@ -1,10 +1,14 @@
 from lstore.table import Table
+from lstore.merge_thread import ThreadPool
+import threading
 
 class Database():
 
     def __init__(self):
         self.tables = []
         self.table_directory = {}
+        self.pool = ThreadPool()
+        self.lock = threading.Lock()
         print("Database created")
         pass
 
@@ -13,6 +17,7 @@ class Database():
         pass
 
     def close(self):
+        self.pool.wail_complete()
         pass
 
     """
@@ -23,7 +28,7 @@ class Database():
     """
     def create_table(self, name, num_columns, key_index):
         print("Table " + name + " created")
-        table = Table(name, num_columns, key_index)
+        table = Table(name, num_columns, key_index, self.pool, self.lock)
         self.tables.append(table)
         self.table_directory[name] = len(self.tables) - 1
         return table
@@ -40,3 +45,4 @@ class Database():
     """
     def get_table(self, name):
         return self.tables[self.table_directory[name]]
+
