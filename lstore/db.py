@@ -67,11 +67,15 @@ class BufferPool:
         page_range_metadata = pickle.load(f)
         f.close()
         return_page_range = Page_Range(page_range_metadata.n_columns,page_range_metadata.next_brid,page_range_metadata.next_trid,page_range_metadata.tail_block_size)
+        return_page_range.meta.next_bpage = page_range_metadata.next_bpage
+        return_page_range.meta.next_tpage = page_range_metadata.next_tpage
+        return_page_range.meta.trid_list = page_range_metadata.trid_list
         for b_index in range(page_range_metadata.next_brid-1):
+            return_page_range.base_page.append(Base_Page())
             for col_index in range(page_range_metadata.n_columns):
+                return_page_range.base_page[b_index].physical_page.append(Base_Page.Physical_Page())
                 f = open(table_name + "_" + str(page_range) + "_basepage_" + str(b_index) + "_col_" + str(col_index) + ".txt", "rb")
-                bcols = pickle.load(f)
-                return_page_range.base_page[b_index].physical_page[col_index].data = bcols
+                return_page_range.base_page[b_index].physical_page[col_index].data = f.read()
 
             f = open(table_name + "_" + str(page_range) + "_basemeta.pickle", "rb")
             b_metadata = pickle.load(f)

@@ -166,8 +166,7 @@ class Query:
         temp_page_range.dirty = 1
         temp_page_range.used_time += 1
         if (temp_page_range.tail_has_capacity() == False):
-            temp_page_range.new_tail_page(self.table.rid)
-            self.rid += 64 * 512
+            self.table.new_tail_page(Page_Range)
         temp_page_range.t_update(Page, Row, columns)
         temp_page_range.pin -= 1
         return True
