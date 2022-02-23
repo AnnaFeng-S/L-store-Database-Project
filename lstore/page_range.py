@@ -21,6 +21,9 @@ class Page_Range:
         self.next_brid = brid
         self.next_trid = trid
         self.trid_list = [trid]
+        self.dirty = 0
+        self.used_time = 0
+        self.pin = 0
 
     def has_capacity(self):
         if len(self.base_page) == BASE_PAGE_MAX_SIZE and not(self.base_page[15].has_capacity()):
