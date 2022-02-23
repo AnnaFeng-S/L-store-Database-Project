@@ -1,7 +1,10 @@
 from lstore.table import Table
+from lstore.page_range import Page_Range
+from lstore.bt_page import Base_Page, Tail_Page
 import pickle
 import os
-
+from lstore.merge_thread import ThreadPool
+import threading
         
 class BufferPool:
     
@@ -13,7 +16,7 @@ class BufferPool:
     def min_used_time(self):
         Min = float("inf")
         for page in self.bufferpool:
-            if (page.used_time < Min) and (page.pin == 0):
+            if page.used_time < Min:
                 Min = page.used_time
                 return_value = self.bufferpool.index(page)
         return return_value
@@ -26,26 +29,68 @@ class BufferPool:
         
     def set_path(self, path):
         self.path = path
-        
-    def memory_to_disk(self,index):
+
+    def memory_to_disk(self, index):
+        #os.chdir(self.path)
+        f = open(self.bufferpool_list[index][0] + "_" + str(self.bufferpool_list[index][1]) + "_page_range_meta.pickle",
+                 "wb")
+        pickle.dump(self.bufferpool[index].meta, f)
+        os.path.join(self.path,
+                     self.bufferpool_list[index][0] + "_" + str(
+                         self.bufferpool_list[index][1]) + "_page_range_meta.pickle")
+        f.close()
         for b_index in range(len(self.bufferpool[index].base_page)):
-            f = open(self.bufferpool_list[index][0]+"_"+self.bufferpool_list[index][1]+"_basemeta.pickle","wb")
-            pickle.dump(self.bufferpool[index].base_page[b_index].metadata,f)
+            f = open(self.bufferpool_list[index][0] + "_" + str(self.bufferpool_list[index][1]) + "_basemeta.pickle", "wb")
+            pickle.dump(self.bufferpool[index].base_page[b_index].meta_data, f)
+            os.path.join(self.path,self.bufferpool_list[index][0] + "_" + str(self.bufferpool_list[index][1]) + "_basemeta.pickle")
             f.close()
-            for col_index in range(len(self.bufferpool[index].base_page[b_index].base_page)):
-                with open("page_range_"+index+"_basepage_"+b_index+"_col_"+col_index+".txt", "wb") as binary_file:
-                    binary_file.write(self.bufferpool[index].base_page[b_index].base_page[col_index].data)
+            for col_index in range(len(self.bufferpool[index].base_page[b_index].physical_page)):
+                with open(self.bufferpool_list[index][0]+"_"+str(self.bufferpool_list[index][1])+"_basepage_"+str(b_index)+"_col_"+str(col_index)+".txt", "wb") as binary_file:
+                    binary_file.write(self.bufferpool[index].base_page[b_index].physical_page[col_index].data)
+                    os.path.join(self.path,
+                                 self.bufferpool_list[index][0]+"_"+str(self.bufferpool_list[index][1])+"_basepage_"+str(b_index)+"_col_"+str(col_index)+".txt")
         for t_index in range(len(self.bufferpool[index].tail_page)):
-            f = open(self.bufferpool_list[index][0]+"_"+self.bufferpool_list[index][1]+"_tailmeta.pickle","wb")
-            pickle.dump(self.bufferpool[index].tail_page[t_index].metadata,f)
-            f.close()            
-            for col_index in range(len(self.bufferpool[index].tail_page[t_index].tail_page)):
-                with open("page_range_"+index+"_tailpage_"+t_index+"_col_"+col_index+".txt", "wb") as binary_file:
-                    binary_file.write(self.bufferpool[index].tail_page[t_index].tail_page[col_index].data)
-    
-    def disk_to_memory(self,table_name, page_range):
-        pass
-    
+            f = open(self.bufferpool_list[index][0] + "_" + str(self.bufferpool_list[index][1]) + "_tailmeta.pickle", "wb")
+            pickle.dump(self.bufferpool[index].tail_page[t_index].meta_data, f)
+            os.path.join(self.path,
+                         self.bufferpool_list[index][0] + "_" + str(self.bufferpool_list[index][1]) + "_tailmeta.pickle")
+            f.close()
+            for col_index in range(len(self.bufferpool[index].tail_page[t_index].physical_page)):
+                with open(self.bufferpool_list[index][0]+"_"+str(self.bufferpool_list[index][1])+"_tailpage_"+str(t_index)+"_col_"+str(col_index)+".txt", "wb") as binary_file:
+                    binary_file.write(self.bufferpool[index].tail_page[t_index].physical_page[col_index].data)
+                    os.path.join(self.path,
+                                 self.bufferpool_list[index][0]+"_"+str(self.bufferpool_list[index][1])+"_tailpage_"+str(t_index)+"_col_"+str(col_index)+".txt")
+
+    def disk_to_memory(self, table_name, page_range):
+        #os.chdir(self.path)
+        f = open(table_name + "_" + str(page_range) + "_page_range_meta.pickle", "rb")
+        page_range_metadata = pickle.load(f)
+        f.close()
+        return_page_range = Page_Range(page_range_metadata.n_columns,page_range_metadata.next_brid,page_range_metadata.next_trid,page_range_metadata.tail_block_size)
+        return_page_range.meta.next_bpage = page_range_metadata.next_bpage
+        return_page_range.meta.next_tpage = page_range_metadata.next_tpage
+        return_page_range.meta.trid_list = page_range_metadata.trid_list
+        return_page_range.meta.merge_time = page_range_metadata.merge_time
+        for b_index in range(page_range_metadata.next_bpage):
+            return_page_range.base_page.append(Base_Page(return_page_range.meta.n_columns))
+            for col_index in range(page_range_metadata.n_columns):
+                #return_page_range.base_page[b_index].physical_page.append(Base_Page.Physical_Page())
+                f = open(table_name + "_" + str(page_range) + "_basepage_" + str(b_index) + "_col_" + str(col_index) + ".txt", "rb")
+                return_page_range.base_page[b_index].physical_page[col_index].data = f.read()
+            f = open(table_name + "_" + str(page_range) + "_basemeta.pickle", "rb")
+            b_metadata = pickle.load(f)
+            return_page_range.base_page[b_index].meta_data = b_metadata
+            f.close()
+        for t_index in range(page_range_metadata.next_tpage):
+            return_page_range.tail_page.append(Tail_Page(return_page_range.meta.n_columns))
+            for col_index in range(page_range_metadata.n_columns):
+                f = open(table_name + "_" + str(page_range) + "_tailpage_" + str(t_index) + "_col_" + str(col_index) + ".txt", "rb")
+                return_page_range.tail_page[t_index].physical_page[col_index].data = f.read()
+            f = open(table_name + "_" + str(page_range) + "_tailmeta.pickle", "rb")
+            t_metadata = pickle.load(f)
+            return_page_range.tail_page[t_index].meta_data = t_metadata
+            f.close()
+        return return_page_range
     
 
 class Database():
@@ -54,6 +99,9 @@ class Database():
         self.tables = []
         self.table_directory = {}
         self.bufferpool = BufferPool()
+        self.path = ''
+        self.pool = ThreadPool()
+        self.lock = threading.Lock()
         print("Database created")
         pass
 
@@ -65,14 +113,18 @@ class Database():
             os.makedirs(path)
 
     def close(self):
+        os.chdir(self.path)
+        self.pool.wail_complete()
         for table in self.tables:
-            f = open(self.path+table.name+'_directory','wb')
+            f = open(table.name+'_directory','wb')
             pickle.dump(table.directory,f)
+            os.path.join(table.name+'_directory')
             f.close()
-            f = open(self.path+table.name+'_index','wb')
+            f = open(table.name+'_index','wb')
             pickle.dump(table.index,f)
+            os.path.join(table.name+'_index')
             f.close()
-        for i in range(self.bufferpool.bufferpool):
+        for i in range(len(self.bufferpool.bufferpool)):
             if self.bufferpool.bufferpool[i].dirty == 1:
                 self.bufferpool.memory_to_disk(i)
 
@@ -85,7 +137,7 @@ class Database():
     """
     def create_table(self, name, num_columns, key_index):
         print("Table " + name + " created")
-        table = Table(name, num_columns, key_index, self.bufferpool)
+        table = Table(name, num_columns, key_index, self.pool, self.lock, self.bufferpool)
         self.tables.append(table)
         self.table_directory[name] = len(self.tables) - 1
         return table
@@ -101,16 +153,16 @@ class Database():
     # Returns table with the passed name
     """
     def get_table(self, name):
-        f = open(self.path+name+'_index','rb')
+        f = open(name+'_index','rb')
         index = pickle.load(f)
         f.close()
-        table = Table(name, index.table_num_columns, index.table_key)
+        table = Table(name, index.table_num_columns, index.table_key, self.pool, self.lock, self.bufferpool)
         table.index = index
-        f = open(self.path+name+'_directory','rb')
+        f = open(name+'_directory','rb')
         directory = pickle.load(f)
         f.close()
         table.directory = directory
         self.tables.append(table)
         self.table_directory[name] = len(self.tables) - 1
-        return return_table
+        return table
         
