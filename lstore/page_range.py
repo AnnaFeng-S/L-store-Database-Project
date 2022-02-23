@@ -4,11 +4,10 @@ import time
 SPECIAL_RID = (2**64)-1
 RID_COLUMN = 0
 BASE_PAGE_MAX_SIZE = 16
-TAIL_BLOCK_SIZE = 64
 PHYSICAL_PAGE_SIZE = 512
 
 class Page_Range:
-    def __init__(self, num_columns, brid, trid):
+    def __init__(self, num_columns, brid, trid, tail_block_size):
         self.base_page = []
         self.tail_page = []
         self.n_columns = num_columns
@@ -17,6 +16,8 @@ class Page_Range:
         self.next_brid = brid
         self.next_trid = trid
         self.trid_list = [trid]
+        self.tail_block_size = tail_block_size
+        self.merge_time = 0
 
     def has_capacity(self):
         if len(self.base_page) == BASE_PAGE_MAX_SIZE and not(self.base_page[15].has_capacity()):
@@ -25,7 +26,7 @@ class Page_Range:
             return True
     
     def tail_has_capacity(self):
-        if (self.next_tpage != 0) and (len(self.tail_page) % TAIL_BLOCK_SIZE == 0) and not(self.tail_page[len(self.tail_page)-1].has_capacity()):
+        if (self.next_tpage != 0) and (len(self.tail_page) % self.tail_block_size == 0) and not(self.tail_page[len(self.tail_page)-1].has_capacity()):
             return False
         else:
             return True
@@ -58,7 +59,6 @@ class Page_Range:
             self.new_base_page()
         rid = self.getNextRID()
         self.base_page[-1].meta_data.write_RID(rid)
-        self.base_page[-1].meta_data.write_SCHEMA(0)
         self.base_page[-1].meta_data.write_INDIRECTION(rid)
         self.base_page[-1].meta_data.write_TIMESTAMP(int(time.time()))
         for i in range(0, self.n_columns):
@@ -69,23 +69,28 @@ class Page_Range:
     def t_locate(self, trid):
         page_block = 0
         for i in range(0, len(self.trid_list)):
-            if trid - self.trid_list[i] < TAIL_BLOCK_SIZE*PHYSICAL_PAGE_SIZE:
+            if trid - self.trid_list[i] < self.tail_block_size*PHYSICAL_PAGE_SIZE:
                 page_block = i
                 break
-        page_index = int((trid-self.trid_list[page_block]) / PHYSICAL_PAGE_SIZE) + TAIL_BLOCK_SIZE * page_block
+        page_index = int((trid-self.trid_list[page_block]) / PHYSICAL_PAGE_SIZE) + self.tail_block_size * page_block
         index = int((trid-self.trid_list[page_block]) % PHYSICAL_PAGE_SIZE)
         return [page_index, index]
 
     def b_read(self, page_index, index):
         record = []
-        if self.base_page[page_index].meta_data.read_SCHEMA(index) == 0:
+        indirection = self.base_page[page_index].meta_data.read_INDIRECTION(index)
+        tps = self.base_page[page_index].meta_data.read_TPS()
+        if self.base_page[page_index].meta_data.read_RID(index) == indirection or indirection < tps:
             for i in range(0, self.n_columns):
                 record.append(self.b_read_col(page_index, index, i))
         else:
             new_loc = self.base_page[page_index].meta_data.read_INDIRECTION(index)
             [new_page_index, new_index] = self.t_locate(new_loc)
             for i in range(0, self.n_columns):
-                record.append(self.t_read_col(new_page_index, new_index, i))
+                if self.base_page[page_index].meta_data.read_bit(i, index) == 1:
+                    record.append(self.t_read_col(new_page_index, new_index, i))
+                else:
+                    record.append(self.b_read_col(page_index, index, i))
         return record
     
     def b_update(self, page_index, index, column, value):
@@ -103,32 +108,46 @@ class Page_Range:
     def t_update(self, page_index, index, values):
         if ((self.next_trid-self.trid_list[-1]) % PHYSICAL_PAGE_SIZE == 0):
             self.new_tail_page()
-        new_record = []
         base_rid = self.base_page[page_index].meta_data.read_RID(index)
+        indirection = self.base_page[page_index].meta_data.read_INDIRECTION(index)
+        tps = self.base_page[page_index].meta_data.read_TPS()
         next_tid = self.getNextTRID()
         self.tail_page[-1].meta_data.write_TID(next_tid)
         self.tail_page[-1].meta_data.write_RID(base_rid)
         self.tail_page[-1].meta_data.write_TIMESTAMP(int(time.time()))
-        if self.base_page[page_index].meta_data.read_SCHEMA(index) == 0:
+        if base_rid == indirection:
             self.tail_page[-1].meta_data.write_INDIRECTION(base_rid)
             for i in range(0, self.n_columns):
-                if values[i] == None:
-                    new_record.append(self.b_read_col(page_index, index, i))
+                if values[i] != None:
+                    self.tail_page[-1].write(i, values[i])
+                    self.base_page[page_index].meta_data.set_bit(i, index)
                 else:
-                    new_record.append(values[i])
+                    self.tail_page[-1].increment(i)
         else:
-            new_rid = self.base_page[page_index].meta_data.read_INDIRECTION(index)
-            self.tail_page[-1].meta_data.write_INDIRECTION(new_rid)
-            [new_page_index, new_index] = self.t_locate(new_rid)
-            for i in range(0, self.n_columns):
-                if values[i] == None:
-                    new_record.append(self.t_read_col(new_page_index, new_index, i))
-                else:
-                    new_record.append(values[i])
-        self.tail_page[-1].write(new_record)
-        self.base_page[page_index].meta_data.update_SCHEMA(index, 1)
+            self.tail_page[-1].meta_data.write_INDIRECTION(indirection)
+            if indirection < tps:
+                for i in range(0, self.n_columns):
+                    if values[i] != None:
+                        self.tail_page[-1].write(i, values[i])
+                        self.base_page[page_index].meta_data.set_bit(i, index)
+                    else:
+                        if self.base_page[page_index].meta_data.read_bit(i, index) == 1:
+                            self.tail_page[-1].write(i, self.b_read_col(page_index, index, i))
+                        else:
+                            self.tail_page[-1].increment(i)
+            else:
+                [new_page_index, new_index] = self.t_locate(indirection)
+                for i in range(0, self.n_columns):
+                    if values[i] != None:
+                        self.tail_page[-1].write(i, values[i])
+                        self.base_page[page_index].meta_data.set_bit(i, index)
+                    else:
+                        if self.base_page[page_index].meta_data.read_bit(i, index) == 1:
+                            self.tail_page[-1].write(i, self.t_read_col(new_page_index, new_index, i))
+                        else:
+                            self.tail_page[-1].increment(i)
         self.base_page[page_index].meta_data.update_INDIRECTION(index, next_tid)
-        
+
     def b_delete(self, page_index, index):
         ori_rid = self.base_page[page_index].meta_data.read_RID(index)
         self.base_page[page_index].meta_data.update_RID(index, SPECIAL_RID)
@@ -137,3 +156,29 @@ class Page_Range:
             [new_page_index, new_index] = self.t_locate(indirection)
             self.tail_page[new_page_index].meta_data.update_TID(new_index, SPECIAL_RID)
             indirection = self.tail_page[new_page_index].meta_data.read_INDIRECTION(new_index)
+
+    def merge(self):
+        for base_page_index in range(0, len(self.base_page)-1):
+            self.base_page_merge(base_page_index)
+        if(self.base_page[-1].has_capacity()):
+            return len(self.base_page)-1
+        else:
+            self.base_page_merge(len(self.base_page)-1)
+            return len(self.base_page)
+
+    def base_page_merge(self, base_page_index):
+        num_records = self.base_page[base_page_index].meta_data.read_num_record()
+        for index in range(0, num_records):
+            rid = self.base_page[base_page_index].meta_data.read_RID(index)
+            indirection = self.base_page[base_page_index].meta_data.read_INDIRECTION(index)
+            tps = self.base_page[base_page_index].meta_data.read_TPS()
+            if rid == SPECIAL_RID or indirection < tps:
+                continue
+            if(rid != indirection):
+                [new_page_index, new_index] = self.t_locate(indirection)
+                for column_index in range(0, self.n_columns):
+                    if self.base_page[base_page_index].meta_data.read_bit(column_index, index) == 1:
+                        temp_data = self.t_read_col(new_page_index, new_index, column_index)
+                        self.b_update(base_page_index, index, column_index, temp_data)
+        self.base_page[base_page_index].meta_data.update_TPS(self.trid_list[self.merge_time] + (self.tail_block_size*PHYSICAL_PAGE_SIZE))
+        

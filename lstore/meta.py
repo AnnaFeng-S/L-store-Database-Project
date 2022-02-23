@@ -18,9 +18,6 @@ class Base_Meta:
         self.num_records += 1
         self.RID[(self.num_records-1) * 8: self.num_records * 8] = RID.to_bytes(8, byteorder='big')
     
-    def write_SCHEMA(self, SCHEMA):
-        self.SCHEMA[(self.num_records-1) * 8: self.num_records * 8] = SCHEMA.to_bytes(8, byteorder='big')
-    
     def write_INDIRECTION(self, INDIRECTION):
         self.INDIRECTION[(self.num_records-1) * 8: self.num_records * 8] = INDIRECTION.to_bytes(8, byteorder='big')
     
@@ -45,9 +42,17 @@ class Base_Meta:
     def read_num_record(self):
         return self.num_records
 
+    def set_bit(self, n, index):
+        initial = int.from_bytes(self.SCHEMA[index * 8: index * 8 + 8], byteorder='big')
+        self.SCHEMA[index * 8: index * 8 + 8] = (initial | (1 << n)).to_bytes(8, byteorder='big')
+
+    def read_bit(self, n, index):
+        initial = int.from_bytes(self.SCHEMA[index * 8: index * 8 + 8], byteorder='big')
+        return (initial >> n) & 1
+
     def update_RID(self, index, RID):
         self.RID[index * 8: index * 8 + 8] = RID.to_bytes(8, byteorder='big')
-    
+
     def update_SCHEMA(self, index, SCHEMA):
         self.SCHEMA[index * 8: index * 8 + 8] = SCHEMA.to_bytes(8, byteorder='big')
     
@@ -56,7 +61,6 @@ class Base_Meta:
 
     def update_TPS(self, new_TPS):
         self.TPS = new_TPS
-
 
 class Tail_Meta:
     def __init__(self):
