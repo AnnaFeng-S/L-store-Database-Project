@@ -11,6 +11,11 @@ class Index:
         self.indices = [None] *  table.num_columns
         # rid count
         self.indices[table.key] = {}
+        
+        #use for get_table
+        self.table_name = table.name
+        self.table_num_columns = table.num_columns
+        self.table_key = table.key
 
     """
     # returns the location of all records with the given value on column "column"
