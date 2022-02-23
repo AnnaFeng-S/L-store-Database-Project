@@ -39,6 +39,7 @@ class BufferPool:
                      self.bufferpool_list[index][0] + "_" + str(
                          self.bufferpool_list[index][1]) + "_page_range_meta.pickle")
         f.close()
+
         for b_index in range(len(self.bufferpool[index].base_page)):
             f = open(self.bufferpool_list[index][0] + "_" + str(self.bufferpool_list[index][1]) + "_basemeta.pickle", "wb")
             pickle.dump(self.bufferpool[index].base_page[b_index].meta_data, f)
@@ -62,36 +63,42 @@ class BufferPool:
                                  self.bufferpool_list[index][0]+"_"+str(self.bufferpool_list[index][1])+"_tailpage_"+str(t_index)+"_col_"+str(col_index)+".txt")
 
     def disk_to_memory(self, table_name, page_range):
-        #os.chdir(self.path)
-        f = open(table_name + "_" + str(page_range) + "_page_range_meta.pickle", "rb")
-        page_range_metadata = pickle.load(f)
-        f.close()
-        return_page_range = Page_Range(page_range_metadata.n_columns,page_range_metadata.next_brid,page_range_metadata.next_trid,page_range_metadata.tail_block_size)
-        return_page_range.meta.next_bpage = page_range_metadata.next_bpage
-        return_page_range.meta.next_tpage = page_range_metadata.next_tpage
-        return_page_range.meta.trid_list = page_range_metadata.trid_list
-        for b_index in range(page_range_metadata.next_brid-1):
-            return_page_range.base_page.append(Base_Page())
-            for col_index in range(page_range_metadata.n_columns):
-                return_page_range.base_page[b_index].physical_page.append(Base_Page.Physical_Page())
-                f = open(table_name + "_" + str(page_range) + "_basepage_" + str(b_index) + "_col_" + str(col_index) + ".txt", "rb")
-                return_page_range.base_page[b_index].physical_page[col_index].data = f.read()
+            #os.chdir(self.path)
 
-            f = open(table_name + "_" + str(page_range) + "_basemeta.pickle", "rb")
-            b_metadata = pickle.load(f)
-            return_page_range.base_page[b_index].meta_data = b_metadata
+            f = open(table_name + "_" + str(page_range) + "_page_range_meta.pickle", "rb")
+            page_range_metadata = pickle.load(f)
             f.close()
-        for t_index in range(page_range_metadata.next_trid-1):
-            for col_index in range(page_range_metadata.n_columns):
-                f = open(table_name + "_" + str(page_range) + "_tailpage_" + str(t_index) + "_col_" + str(col_index) + ".txt", "rb")
-                tcols = pickle.load(f)
-                return_page_range.tail_page[col_index].data = tcols
-            f = open(table_name + "_" + str(page_range) + "_tailmeta.pickle", "rb")
-            t_metadata = pickle.load(f)
-            return_page_range.tail_page[t_index].meta_data = t_metadata
-            f.close()
-        return return_page_range
-    
+            return_page_range = Page_Range(num_columns=page_range_metadata.n_columns, brid= page_range_metadata.next_brid,
+                                           trid=page_range_metadata.next_trid, tail_block_size=page_range_metadata.tail_block_size)
+            return_page_range.meta.next_bpage = page_range_metadata.next_bpage
+            return_page_range.meta.next_tpage = page_range_metadata.next_tpage
+            return_page_range.meta.trid_list = page_range_metadata.trid_list
+            return_page_range.meta.merge_time = 0
+            for b_index in range(page_range_metadata.next_bpage - 1):
+                return_page_range.base_page.append(Base_Page(page_range_metadata.n_columns))
+                for col_index in range(page_range_metadata.n_columns):
+                    return_page_range.base_page[b_index].physical_page.append([])
+                    f = open(table_name + "_" + str(page_range) + "_basepage_" + str(b_index) + "_col_" + str(
+                        col_index) + ".txt", "rb")
+                    return_page_range.base_page[b_index].physical_page[col_index].data = f.read()
+                f = open(table_name + "_" + str(page_range) + "_basemeta.pickle", "rb")
+                b_metadata = pickle.load(f)
+                return_page_range.base_page[b_index].meta_data = b_metadata
+                f.close()
+
+            for t_index in range(page_range_metadata.next_tpage-1):
+                return_page_range.base_page.append(Tail_Page(page_range_metadata.n_columns))
+                for col_index in range(page_range_metadata.n_columns):
+                    return_page_range.tail_page[t_index].physical_page.append([])
+                    f = open(table_name + "_" + str(page_range) + "_tailpage_" + str(t_index) + "_col_" + str(col_index) + ".txt", "rb")
+                    tcols = pickle.load(f)
+                    return_page_range.tail_page[col_index].data = tcols
+                f = open(table_name + "_" + str(page_range) + "_tailmeta.pickle", "rb")
+                t_metadata = pickle.load(f)
+                return_page_range.tail_page[t_index].meta_data = t_metadata
+                f.close()
+            return return_page_range
+
 
 class Database():
 
