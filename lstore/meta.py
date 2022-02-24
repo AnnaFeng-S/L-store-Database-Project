@@ -6,6 +6,7 @@ class Base_Meta:
         self.TIMESTAMP = bytearray(4096)
         self.num_columns = num_columns
         self.num_records = 0
+        self.merge_time = 0
         self.TPS = 0
 
     def has_capacity(self):

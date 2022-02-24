@@ -41,15 +41,15 @@ class Query:
             temp_page_range.pin += 1
         else:
             temp_index = self.table.bufferpool.min_used_time()
-            if self.table.bufferpool.bufferpool[temp_index].dirty == 1:
-                self.table.bufferpool.memory_to_disk(temp_index)
+            #if self.table.bufferpool.bufferpool[temp_index].dirty == 1:
+            self.table.bufferpool.memory_to_disk(temp_index)
             temp_page_range = self.table.bufferpool.disk_to_memory(self.table.name, Page_Range)
             self.table.bufferpool.bufferpool_list[temp_index] = [self.table.name, Page_Range]
             self.table.bufferpool.bufferpool[temp_index] = temp_page_range
             temp_page_range.pin += 1
         temp_page_range.b_delete(Page, Row)
         temp_page_range.used_time += 1
-        temp_page_range.dirty = 1
+        temp_page_range.base_page[Page].dirty = 1
         self.table.index.delete(self.table.key, primary_key, rid)
         self.table.directory.pop(rid)
         temp_page_range.pin -= 1
@@ -71,20 +71,19 @@ class Query:
             check = 1
         if check == 1:
             if self.table.bufferpool.has_capacity() == True:
-                self.table.page_range_list[-1].dirty = 1
                 self.table.bufferpool.bufferpool.append(self.table.page_range_list[-1])
                 self.table.bufferpool.bufferpool_list.append([self.table.name, len(self.table.page_range_list) - 1])
                 temp_page_range = self.table.bufferpool.bufferpool[-1]
             else:
                 temp_index = self.table.bufferpool.min_used_time()
-                if self.table.bufferpool.bufferpool[temp_index].dirty == 1:
-                    self.table.bufferpool.memory_to_disk(temp_index)
-                self.table.page_range_list[-1].dirty = 1
+                #if self.table.bufferpool.bufferpool[temp_index].dirty == 1:
+                self.table.bufferpool.memory_to_disk(temp_index)
                 self.table.bufferpool.bufferpool[temp_index] = self.table.page_range_list[-1]
                 self.table.bufferpool.bufferpool_list[temp_index] = [self.table.name, len(self.table.page_range_list) - 1]
                 temp_page_range = self.table.bufferpool.bufferpool[temp_index]
         self.table.page_range_list[-1].pin += 1
         [rid, page_index, index] = self.table.page_range_list[-1].b_write(columns)
+        self.table.page_range_list[-1].base_page[page_index].dirty = 1
         self.table.index.insert(self.table.key, columns[0], rid)
         self.table.directory[rid] = [len(self.table.page_range_list) - 1, page_index, index]
         self.table.page_range_list[-1].used_time += 1
@@ -116,8 +115,8 @@ class Query:
                 temp_page_range.pin += 1
             else:
                 temp_index = self.table.bufferpool.min_used_time()
-                if self.table.bufferpool.bufferpool[temp_index].dirty == 1:
-                    self.table.bufferpool.memory_to_disk(temp_index)
+                #if self.table.bufferpool.bufferpool[temp_index].dirty == 1:
+                self.table.bufferpool.memory_to_disk(temp_index)
                 temp_page_range = self.table.bufferpool.disk_to_memory(self.table.name, Page_Range)
                 self.table.bufferpool.bufferpool_list[temp_index] = [self.table.name, Page_Range]
                 self.table.bufferpool.bufferpool[temp_index] = temp_page_range
@@ -157,21 +156,22 @@ class Query:
             temp_page_range.pin += 1
         else:
             temp_index = self.table.bufferpool.min_used_time()
-            if self.table.bufferpool.bufferpool[temp_index].dirty == 1:
-                self.table.bufferpool.memory_to_disk(temp_index)
+            #if self.table.bufferpool.bufferpool[temp_index].dirty == 1:
+            self.table.bufferpool.memory_to_disk(temp_index)
             temp_page_range = self.table.bufferpool.disk_to_memory(self.table.name, Page_Range)
             self.table.bufferpool.bufferpool_list[temp_index] = [self.table.name, Page_Range]
             self.table.bufferpool.bufferpool[temp_index] = temp_page_range
             temp_page_range.pin += 1
-        temp_page_range.dirty = 1
         temp_page_range.used_time += 1
         if (temp_page_range.tail_has_capacity() == False):
             self.table.new_tail_page(Page_Range)
-        test_data = temp_page_range.b_read(Page, Row)
+        temp_page_range.base_page[Page].dirty = 1
+        #test_data = temp_page_range.b_read(Page, Row)
         #print("Data before Update: ", test_data)
         #print("Indirection before Update: ", temp_page_range.base_page[0].meta_data.read_INDIRECTION(0))
         temp_page_range.t_update(Page, Row, columns)
-        test_data = temp_page_range.b_read(Page, Row)
+        temp_page_range.tail_page[-1].dirty = 1
+        #test_data = temp_page_range.b_read(Page, Row)
         #print("Data after Update: ", test_data)
         #print("Indirection after Update: ", temp_page_range.base_page[0].meta_data.read_INDIRECTION(0))
         temp_page_range.pin -= 1
@@ -204,8 +204,8 @@ class Query:
                 temp_page_range.pin += 1
             else:
                 temp_index = self.table.bufferpool.min_used_time()
-                if self.table.bufferpool.bufferpool[temp_index].dirty == 1:
-                    self.table.bufferpool.memory_to_disk(temp_index)
+                #if self.table.bufferpool.bufferpool[temp_index].dirty == 1:
+                self.table.bufferpool.memory_to_disk(temp_index)
                 temp_page_range = self.table.bufferpool.disk_to_memory(self.table.name, Page_Range)
                 self.table.bufferpool.bufferpool_list[temp_index] = [self.table.name, Page_Range]
                 self.table.bufferpool.bufferpool[temp_index] = temp_page_range

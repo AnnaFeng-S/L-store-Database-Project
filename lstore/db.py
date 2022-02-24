@@ -29,40 +29,68 @@ class BufferPool:
         
     def set_path(self, path):
         self.path = path
-        #os.chdir(self.path)
+        os.chdir(self.path)
 
     def memory_to_disk(self, index):
-        #os.chdir(self.path)
-        #print("Memory to disk, Page Range: " + str(self.bufferpool_list[index][1]))
+        Last_saved_base = self.bufferpool[index].meta.Last_saved_base
+        Last_saved_tail = self.bufferpool[index].meta.Last_saved_tail
+        if self.bufferpool[index].dirty == 1:
+            for b_index in range(len(self.bufferpool[index].base_page)):
+                f = open(self.bufferpool_list[index][0] + "_" + str(self.bufferpool_list[index][1]) + "_base_"+ str(b_index) + "_meta.pickle", "wb")
+                pickle.dump(self.bufferpool[index].base_page[b_index].meta_data, f)
+                os.path.join(self.path,self.bufferpool_list[index][0] + "_" + str(self.bufferpool_list[index][1]) + "_base_"+ str(b_index) + "_meta.pickle")
+                f.close()
+                for col_index in range(len(self.bufferpool[index].base_page[b_index].physical_page)):
+                    with open(self.bufferpool_list[index][0]+"_"+str(self.bufferpool_list[index][1])+"_basepage_"+str(b_index)+"_col_"+str(col_index)+".txt", "wb") as binary_file:
+                        binary_file.write(self.bufferpool[index].base_page[b_index].physical_page[col_index].data)
+                        os.path.join(self.path,
+                                     self.bufferpool_list[index][0]+"_"+str(self.bufferpool_list[index][1])+"_basepage_"+str(b_index)+"_col_"+str(col_index)+".txt")
+            for t_index in range(Last_saved_tail, len(self.bufferpool[index].tail_page)):
+                f = open(self.bufferpool_list[index][0] + "_" + str(self.bufferpool_list[index][1]) + "_tail_"+ str(t_index) + "_meta.pickle", "wb")
+                pickle.dump(self.bufferpool[index].tail_page[t_index].meta_data, f)
+                os.path.join(self.path,
+                                self.bufferpool_list[index][0] + "_" + str(self.bufferpool_list[index][1]) + "_tail_"+ str(t_index) + "_meta.pickle")
+                f.close()
+                for col_index in range(len(self.bufferpool[index].tail_page[t_index].physical_page)):
+                    with open(self.bufferpool_list[index][0]+"_"+str(self.bufferpool_list[index][1])+"_tailpage_"+str(t_index)+"_col_"+str(col_index)+".txt", "wb") as binary_file:
+                        binary_file.write(self.bufferpool[index].tail_page[t_index].physical_page[col_index].data)
+                        os.path.join(self.path,
+                                         self.bufferpool_list[index][0]+"_"+str(self.bufferpool_list[index][1])+"_tailpage_"+str(t_index)+"_col_"+str(col_index)+".txt")
+                self.bufferpool[index].tail_page[b_index].dirty == 0
+                self.bufferpool[index].meta.Last_saved_tail = t_index
+        else:
+            for b_index in range(Last_saved_base, len(self.bufferpool[index].base_page)):
+                if self.bufferpool[index].base_page[b_index].dirty == 1:
+                    f = open(self.bufferpool_list[index][0] + "_" + str(self.bufferpool_list[index][1]) + "_base_"+ str(b_index) + "_meta.pickle", "wb")
+                    pickle.dump(self.bufferpool[index].base_page[b_index].meta_data, f)
+                    os.path.join(self.path,self.bufferpool_list[index][0] + "_" + str(self.bufferpool_list[index][1]) + "_base_"+ str(b_index) + "_meta.pickle")
+                    f.close()
+                    for col_index in range(len(self.bufferpool[index].base_page[b_index].physical_page)):
+                        with open(self.bufferpool_list[index][0]+"_"+str(self.bufferpool_list[index][1])+"_basepage_"+str(b_index)+"_col_"+str(col_index)+".txt", "wb") as binary_file:
+                            binary_file.write(self.bufferpool[index].base_page[b_index].physical_page[col_index].data)
+                            os.path.join(self.path,
+                                         self.bufferpool_list[index][0]+"_"+str(self.bufferpool_list[index][1])+"_basepage_"+str(b_index)+"_col_"+str(col_index)+".txt")
+                    self.bufferpool[index].base_page[b_index].dirty == 0
+                    self.bufferpool[index].meta.Last_saved_base = b_index
+            for t_index in range(Last_saved_tail, len(self.bufferpool[index].tail_page)):
+                f = open(self.bufferpool_list[index][0] + "_" + str(self.bufferpool_list[index][1]) + "_tail_"+ str(t_index) + "_meta.pickle", "wb")
+                pickle.dump(self.bufferpool[index].tail_page[t_index].meta_data, f)
+                os.path.join(self.path,
+                                self.bufferpool_list[index][0] + "_" + str(self.bufferpool_list[index][1]) + "_tail_"+ str(t_index) + "_meta.pickle")
+                f.close()
+                for col_index in range(len(self.bufferpool[index].tail_page[t_index].physical_page)):
+                    with open(self.bufferpool_list[index][0]+"_"+str(self.bufferpool_list[index][1])+"_tailpage_"+str(t_index)+"_col_"+str(col_index)+".txt", "wb") as binary_file:
+                        binary_file.write(self.bufferpool[index].tail_page[t_index].physical_page[col_index].data)
+                        os.path.join(self.path,
+                                        self.bufferpool_list[index][0]+"_"+str(self.bufferpool_list[index][1])+"_tailpage_"+str(t_index)+"_col_"+str(col_index)+".txt")
+                self.bufferpool[index].tail_page[b_index].dirty == 0
+                self.bufferpool[index].meta.Last_saved_tail = t_index   
         f = open(self.bufferpool_list[index][0] + "_" + str(self.bufferpool_list[index][1]) + "_page_range_meta.pickle",
                  "wb")
         pickle.dump(self.bufferpool[index].meta, f)
-        os.path.join(self.path,
-                     self.bufferpool_list[index][0] + "_" + str(
-                         self.bufferpool_list[index][1]) + "_page_range_meta.pickle")
+        os.path.join(self.path,self.bufferpool_list[index][0] + "_" + str(self.bufferpool_list[index][1]) + "_page_range_meta.pickle")
         f.close()
-        for b_index in range(len(self.bufferpool[index].base_page)):
-            f = open(self.bufferpool_list[index][0] + "_" + str(self.bufferpool_list[index][1]) + "_base_"+ str(b_index) + "_meta.pickle", "wb")
-            pickle.dump(self.bufferpool[index].base_page[b_index].meta_data, f)
-            os.path.join(self.path,self.bufferpool_list[index][0] + "_" + str(self.bufferpool_list[index][1]) + "_base_"+ str(b_index) + "_meta.pickle")
-            f.close()
-            for col_index in range(len(self.bufferpool[index].base_page[b_index].physical_page)):
-                with open(self.bufferpool_list[index][0]+"_"+str(self.bufferpool_list[index][1])+"_basepage_"+str(b_index)+"_col_"+str(col_index)+".txt", "wb") as binary_file:
-                    binary_file.write(self.bufferpool[index].base_page[b_index].physical_page[col_index].data)
-                    os.path.join(self.path,
-                                 self.bufferpool_list[index][0]+"_"+str(self.bufferpool_list[index][1])+"_basepage_"+str(b_index)+"_col_"+str(col_index)+".txt")
-        for t_index in range(len(self.bufferpool[index].tail_page)):
-            f = open(self.bufferpool_list[index][0] + "_" + str(self.bufferpool_list[index][1]) + "_tail_"+ str(t_index) + "_meta.pickle", "wb")
-            pickle.dump(self.bufferpool[index].tail_page[t_index].meta_data, f)
-            os.path.join(self.path,
-                         self.bufferpool_list[index][0] + "_" + str(self.bufferpool_list[index][1]) + "_tail_"+ str(t_index) + "_meta.pickle")
-            f.close()
-            for col_index in range(len(self.bufferpool[index].tail_page[t_index].physical_page)):
-                with open(self.bufferpool_list[index][0]+"_"+str(self.bufferpool_list[index][1])+"_tailpage_"+str(t_index)+"_col_"+str(col_index)+".txt", "wb") as binary_file:
-                    binary_file.write(self.bufferpool[index].tail_page[t_index].physical_page[col_index].data)
-                    os.path.join(self.path,
-                                 self.bufferpool_list[index][0]+"_"+str(self.bufferpool_list[index][1])+"_tailpage_"+str(t_index)+"_col_"+str(col_index)+".txt")
-        
+                    
     def disk_to_memory(self, table_name, page_range):
         #os.chdir(self.path)
         #print("Disk to memory: ", page_range)
@@ -73,7 +101,8 @@ class BufferPool:
         return_page_range.meta.next_bpage = page_range_metadata.next_bpage
         return_page_range.meta.next_tpage = page_range_metadata.next_tpage
         return_page_range.meta.trid_list = page_range_metadata.trid_list
-        return_page_range.meta.merge_time = page_range_metadata.merge_time
+        return_page_range.meta.Last_saved_base = page_range_metadata.Last_saved_base
+        return_page_range.meta.Last_saved_tail = page_range_metadata.Last_saved_tail
         #print("Disk to memory: ", return_page_range.meta.merge_time)
         for b_index in range(page_range_metadata.next_bpage):
             return_page_range.base_page.append(Base_Page(return_page_range.meta.n_columns))
@@ -115,13 +144,13 @@ class Database():
 
     # Not required for milestone1
     def open(self, path):
-        self.bufferpool.set_path(path)
         self.path = path
         if not os.path.exists(path):
             os.makedirs(path)
+        self.bufferpool.set_path(path)
+        
 
     def close(self):
-        os.chdir(self.path)
         self.pool.wail_complete()
         for table in self.tables:
             f = open(table.name+'_directory','wb')
