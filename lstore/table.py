@@ -64,7 +64,7 @@ class Table:
             self.bufferpool.bufferpool_list[temp_index] = [self.name, Page_Range]
             self.bufferpool.bufferpool[temp_index] = temp_page_range
             temp_page_range.pin += 1
-        print("Merge")
+        print("Merge Page Range: " + str(Page_Range))
         page_range_copy = copy.deepcopy(temp_page_range)
         # Print Meta Information of Page Range
         num_updated = page_range_copy.merge()
@@ -85,4 +85,4 @@ class Table:
     def new_tail_page(self, page_range):
         self.page_range_list[page_range].more_tail_page(self.rid)
         self.rid += TAIL_BLOCK_RECORD
-        self.pool.add_task(self.__merge, page_range)
+        #self.pool.add_task(self.__merge, page_range)

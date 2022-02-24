@@ -79,10 +79,14 @@ class Page_Range:
         record = []
         indirection = self.base_page[page_index].meta_data.read_INDIRECTION(index)
         tps = self.base_page[page_index].meta_data.read_TPS()
+        #print(indirection)
+        #print(tps)
         if self.base_page[page_index].meta_data.read_RID(index) == indirection or indirection < tps:
+            #print("Read from base page")
             for i in range(0, self.meta.n_columns):
                 record.append(self.b_read_col(page_index, index, i))
         else:
+            #print("Read from tail page")
             new_loc = self.base_page[page_index].meta_data.read_INDIRECTION(index)
             [new_page_index, new_index] = self.t_locate(new_loc)
             for i in range(0, self.meta.n_columns):

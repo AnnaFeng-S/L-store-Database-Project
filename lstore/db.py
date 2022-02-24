@@ -32,6 +32,7 @@ class BufferPool:
 
     def memory_to_disk(self, index):
         #os.chdir(self.path)
+        print("Memory to disk, Page Range: " + str(self.bufferpool_list[index][1]))
         f = open(self.bufferpool_list[index][0] + "_" + str(self.bufferpool_list[index][1]) + "_page_range_meta.pickle",
                  "wb")
         pickle.dump(self.bufferpool[index].meta, f)
@@ -63,6 +64,7 @@ class BufferPool:
 
     def disk_to_memory(self, table_name, page_range):
         #os.chdir(self.path)
+        print("Disk to memory: ", page_range)
         f = open(table_name + "_" + str(page_range) + "_page_range_meta.pickle", "rb")
         page_range_metadata = pickle.load(f)
         f.close()
@@ -71,6 +73,7 @@ class BufferPool:
         return_page_range.meta.next_tpage = page_range_metadata.next_tpage
         return_page_range.meta.trid_list = page_range_metadata.trid_list
         return_page_range.meta.merge_time = page_range_metadata.merge_time
+        #print("Disk to memory: ", return_page_range.meta.merge_time)
         for b_index in range(page_range_metadata.next_bpage):
             return_page_range.base_page.append(Base_Page(return_page_range.meta.n_columns))
             f = open(table_name + "_" + str(page_range) + "_basemeta.pickle", "rb")
@@ -85,13 +88,15 @@ class BufferPool:
                 f.close()
         for t_index in range(page_range_metadata.next_tpage):
             return_page_range.tail_page.append(Tail_Page(return_page_range.meta.n_columns))
-            for col_index in range(page_range_metadata.n_columns):
-                f = open(table_name + "_" + str(page_range) + "_tailpage_" + str(t_index) + "_col_" + str(col_index) + ".txt", "rb")
-                return_page_range.tail_page[t_index].physical_page[col_index].data = f.read()
             f = open(table_name + "_" + str(page_range) + "_tailmeta.pickle", "rb")
             t_metadata = pickle.load(f)
             return_page_range.tail_page[t_index].meta_data = t_metadata
             f.close()
+            for col_index in range(page_range_metadata.n_columns):
+                f = open(table_name + "_" + str(page_range) + "_tailpage_" + str(t_index) + "_col_" + str(col_index) + ".txt", "rb")
+                return_page_range.tail_page[t_index].physical_page[col_index].data = f.read()
+                return_page_range.tail_page[t_index].physical_page[col_index].num_records = return_page_range.tail_page[t_index].meta_data.num_records
+                f.close()
         return return_page_range
     
 
