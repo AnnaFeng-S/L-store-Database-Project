@@ -70,7 +70,7 @@ class BPT:
                     break
 
         return current_node
-    
+
     def location(self, value):
         l = self.search(value)
         loc = 0
@@ -82,7 +82,7 @@ class BPT:
             return l.keys[loc]
         else:
             return None
-    
+
     def range(self, begin, end):
         l = self.search(begin)
         start = -1
@@ -285,7 +285,7 @@ class BPT:
                 if not parentNode.has_leaf:
                     for j in parentNode.keys:
                         j.parent = parentNode
-    
+
 
 
 """record_len = 3
@@ -320,7 +320,7 @@ bplustree.delete(9, 5)
 """
 
 class Index:
-    
+
     def __init__(self, table):
         # One index for each table. All our empty initially.
         self.indices = [None] *  table.num_columns
@@ -347,7 +347,7 @@ class Index:
             return None
         else:
             return col_dict.range(begin,end)
-        
+
 
     """
     # optional: Create index on specific column
@@ -368,7 +368,7 @@ class Index:
 
     def drop_index(self, column):
         self.indices[column] = None
-        
+
     """ 
     # Insert New Record
     """
@@ -384,7 +384,7 @@ class Index:
         col_dict = self.indices[column]
         if col_dict.location(value) != None:
             col_dict.delete(value,rid)
-            
+
 
     """ 
     # Update record with this
