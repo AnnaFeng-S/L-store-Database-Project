@@ -73,14 +73,16 @@ class BufferPool:
         return_page_range.meta.merge_time = page_range_metadata.merge_time
         for b_index in range(page_range_metadata.next_bpage):
             return_page_range.base_page.append(Base_Page(return_page_range.meta.n_columns))
-            for col_index in range(page_range_metadata.n_columns):
-                #return_page_range.base_page[b_index].physical_page.append(Base_Page.Physical_Page())
-                f = open(table_name + "_" + str(page_range) + "_basepage_" + str(b_index) + "_col_" + str(col_index) + ".txt", "rb")
-                return_page_range.base_page[b_index].physical_page[col_index].data = f.read()
             f = open(table_name + "_" + str(page_range) + "_basemeta.pickle", "rb")
             b_metadata = pickle.load(f)
             return_page_range.base_page[b_index].meta_data = b_metadata
             f.close()
+            for col_index in range(page_range_metadata.n_columns):
+                #return_page_range.base_page[b_index].physical_page.append(Base_Page.Physical_Page())
+                f = open(table_name + "_" + str(page_range) + "_basepage_" + str(b_index) + "_col_" + str(col_index) + ".txt", "rb")
+                return_page_range.base_page[b_index].physical_page[col_index].data = f.read()
+                return_page_range.base_page[b_index].physical_page[col_index].num_records = return_page_range.base_page[b_index].meta_data.num_records
+                f.close()
         for t_index in range(page_range_metadata.next_tpage):
             return_page_range.tail_page.append(Tail_Page(return_page_range.meta.n_columns))
             for col_index in range(page_range_metadata.n_columns):

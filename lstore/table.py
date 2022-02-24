@@ -46,28 +46,34 @@ class Table:
         self.bufferpool = bufferpool
         pass
 
-    def __merge(self, page_range):
-        # print("Merge is happening for page range: " + str(page_range))
-        page_range_copy = copy.deepcopy(self.page_range_list[page_range])
-        num_updated = page_range_copy.merge()
-        if self.lock.acquire():
-            # print("Get the lock, others cannot access the page range")
-            try:
-                for i in range(num_updated):
-                    self.page_range_list[page_range].base_page[i].physical_page = page_range_copy.base_page[
-                        i].physical_page
-                    self.page_range_list[page_range].base_page[i].meta_data.TPS = page_range_copy.base_page[
-                        i].meta_data.TPS
-                self.page_range_list[page_range].merge_time += 1
-            finally:
-                time.sleep(1)
-                # print("Release the lock")
-                self.lock.release()
-                # print("Lock released")
+    def __merge(self, Page_Range):
+        if [self.name, Page_Range] in self.bufferpool.bufferpool_list:
+            temp_page_range = self.bufferpool.bufferpool[
+                self.bufferpool.bufferpool_list.index([self.name, Page_Range])]
+            temp_page_range.pin += 1
+        elif self.bufferpool.has_capacity() == True:
+            self.bufferpool.bufferpool_list.append([self.name, Page_Range])
+            temp_page_range = self.bufferpool.disk_to_memory(self.name, Page_Range)
+            self.bufferpool.bufferpool.append(temp_page_range)
+            temp_page_range.pin += 1
         else:
-            raise Exception("Could not acquire lock")
-        # print("Updated TPS" + str(page_range_copy.base_page[0].meta_data.TPS))
-        # print("Thread is done")
+            temp_index = self.bufferpool.min_used_time()
+            if self.bufferpool.bufferpool[temp_index].dirty == 1:
+                self.bufferpool.memory_to_disk(temp_index)
+            temp_page_range = self.bufferpool.disk_to_memory(self.name, Page_Range)
+            self.bufferpool.bufferpool_list[temp_index] = [self.name, Page_Range]
+            self.bufferpool.bufferpool[temp_index] = temp_page_range
+            temp_page_range.pin += 1
+        print("Merge")
+        page_range_copy = copy.deepcopy(temp_page_range)
+        # Print Meta Information of Page Range
+        num_updated = page_range_copy.merge()
+        for i in range(num_updated):
+            temp_page_range.base_page[i].physical_page = page_range_copy.base_page[i].physical_page
+            temp_page_range.base_page[i].meta_data.TPS = page_range_copy.base_page[i].meta_data.TPS
+            temp_page_range.meta.merge_time += 1
+            temp_page_range.dirty = 1
+        print("Thread is done")
 
     def new_page_range(self):
         # print("New Page Range")
