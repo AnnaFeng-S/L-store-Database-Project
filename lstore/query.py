@@ -167,7 +167,13 @@ class Query:
         temp_page_range.used_time += 1
         if (temp_page_range.tail_has_capacity() == False):
             self.table.new_tail_page(Page_Range)
+        test_data = temp_page_range.b_read(Page, Row)
+        #print("Data before Update: ", test_data)
+        #print("Indirection before Update: ", temp_page_range.base_page[0].meta_data.read_INDIRECTION(0))
         temp_page_range.t_update(Page, Row, columns)
+        test_data = temp_page_range.b_read(Page, Row)
+        #print("Data after Update: ", test_data)
+        #print("Indirection after Update: ", temp_page_range.base_page[0].meta_data.read_INDIRECTION(0))
         temp_page_range.pin -= 1
         return True
 

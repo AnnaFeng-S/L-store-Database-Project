@@ -29,11 +29,11 @@ class BufferPool:
         
     def set_path(self, path):
         self.path = path
-        os.chdir(self.path)
+        #os.chdir(self.path)
 
     def memory_to_disk(self, index):
         #os.chdir(self.path)
-        print("Memory to disk, Page Range: " + str(self.bufferpool_list[index][1]))
+        #print("Memory to disk, Page Range: " + str(self.bufferpool_list[index][1]))
         f = open(self.bufferpool_list[index][0] + "_" + str(self.bufferpool_list[index][1]) + "_page_range_meta.pickle",
                  "wb")
         pickle.dump(self.bufferpool[index].meta, f)
@@ -42,57 +42,21 @@ class BufferPool:
                          self.bufferpool_list[index][1]) + "_page_range_meta.pickle")
         f.close()
         for b_index in range(len(self.bufferpool[index].base_page)):
-            f = open(self.bufferpool_list[index][0] + "_" + str(self.bufferpool_list[index][1]) + "_basemeta.pickle", "wb")
+            f = open(self.bufferpool_list[index][0] + "_" + str(self.bufferpool_list[index][1]) + "_base_"+ str(b_index) + "_meta.pickle", "wb")
             pickle.dump(self.bufferpool[index].base_page[b_index].meta_data, f)
-            os.path.join(self.path,self.bufferpool_list[index][0] + "_" + str(self.bufferpool_list[index][1]) + "_basemeta.pickle")
+            os.path.join(self.path,self.bufferpool_list[index][0] + "_" + str(self.bufferpool_list[index][1]) + "_base_"+ str(b_index) + "_meta.pickle")
             f.close()
-            #new
-            with open(self.bufferpool_list[index][0]+"_"+str(self.bufferpool_list[index][1])+"_base_meta_RID.txt", "wb") as f:
-                f.write(self.bufferpool[index].base_page[b_index].meta_data.RID)
-                os.path.join(self.path,
-                                 self.bufferpool_list[index][0]+"_"+str(self.bufferpool_list[index][1])+"_base_meta_RID.txt")
-            with open(self.bufferpool_list[index][0]+"_"+str(self.bufferpool_list[index][1])+"_base_meta_SCHEMA.txt", "wb") as f:
-                f.write(self.bufferpool[index].base_page[b_index].meta_data.SCHEMA)
-                os.path.join(self.path,
-                                 self.bufferpool_list[index][0]+"_"+str(self.bufferpool_list[index][1])+"_base_meta_SCHEMA.txt")
-            with open(self.bufferpool_list[index][0]+"_"+str(self.bufferpool_list[index][1])+"_base_meta_INDIRECTION.txt", "wb") as f:
-                f.write(self.bufferpool[index].base_page[b_index].meta_data.INDIRECTION)
-                os.path.join(self.path,
-                                 self.bufferpool_list[index][0]+"_"+str(self.bufferpool_list[index][1])+"_base_meta_INDIRECTION.txt")
-            with open(self.bufferpool_list[index][0]+"_"+str(self.bufferpool_list[index][1])+"_base_meta_TIMESTAMP.txt", "wb") as f:
-                f.write(self.bufferpool[index].base_page[b_index].meta_data.TIMESTAMP)
-                os.path.join(self.path,
-                                 self.bufferpool_list[index][0]+"_"+str(self.bufferpool_list[index][1])+"_base_meta_TIMESTAMP.txt")
-            #end
             for col_index in range(len(self.bufferpool[index].base_page[b_index].physical_page)):
                 with open(self.bufferpool_list[index][0]+"_"+str(self.bufferpool_list[index][1])+"_basepage_"+str(b_index)+"_col_"+str(col_index)+".txt", "wb") as binary_file:
                     binary_file.write(self.bufferpool[index].base_page[b_index].physical_page[col_index].data)
                     os.path.join(self.path,
                                  self.bufferpool_list[index][0]+"_"+str(self.bufferpool_list[index][1])+"_basepage_"+str(b_index)+"_col_"+str(col_index)+".txt")
         for t_index in range(len(self.bufferpool[index].tail_page)):
-            f = open(self.bufferpool_list[index][0] + "_" + str(self.bufferpool_list[index][1]) + "_tailmeta.pickle", "wb")
+            f = open(self.bufferpool_list[index][0] + "_" + str(self.bufferpool_list[index][1]) + "_tail_"+ str(t_index) + "_meta.pickle", "wb")
             pickle.dump(self.bufferpool[index].tail_page[t_index].meta_data, f)
             os.path.join(self.path,
-                         self.bufferpool_list[index][0] + "_" + str(self.bufferpool_list[index][1]) + "_tailmeta.pickle")
+                         self.bufferpool_list[index][0] + "_" + str(self.bufferpool_list[index][1]) + "_tail_"+ str(t_index) + "_meta.pickle")
             f.close()
-            #new
-            with open(self.bufferpool_list[index][0]+"_"+str(self.bufferpool_list[index][1])+"_tail_meta_RID.txt", "wb") as f:
-                f.write(self.bufferpool[index].tail_page[t_index].meta_data.RID)
-                os.path.join(self.path,
-                                 self.bufferpool_list[index][0]+"_"+str(self.bufferpool_list[index][1])+"_tail_meta_RID.txt")
-            with open(self.bufferpool_list[index][0]+"_"+str(self.bufferpool_list[index][1])+"_tail_meta_TID.txt", "wb") as f:
-                f.write(self.bufferpool[index].tail_page[t_index].meta_data.TID)
-                os.path.join(self.path,
-                                 self.bufferpool_list[index][0]+"_"+str(self.bufferpool_list[index][1])+"_tail_meta_TID.txt")
-            with open(self.bufferpool_list[index][0]+"_"+str(self.bufferpool_list[index][1])+"_tail_meta_INDIRECTION.txt", "wb") as f:
-                f.write(self.bufferpool[index].tail_page[t_index].meta_data.INDIRECTION)
-                os.path.join(self.path,
-                                 self.bufferpool_list[index][0]+"_"+str(self.bufferpool_list[index][1])+"_tail_meta_INDIRECTION.txt")
-            with open(self.bufferpool_list[index][0]+"_"+str(self.bufferpool_list[index][1])+"_tail_meta_TIMESTAMP.txt", "wb") as f:
-                f.write(self.bufferpool[index].tail_page[t_index].meta_data.TIMESTAMP)
-                os.path.join(self.path,
-                                 self.bufferpool_list[index][0]+"_"+str(self.bufferpool_list[index][1])+"_tail_meta_TIMESTAMP.txt")
-            #end
             for col_index in range(len(self.bufferpool[index].tail_page[t_index].physical_page)):
                 with open(self.bufferpool_list[index][0]+"_"+str(self.bufferpool_list[index][1])+"_tailpage_"+str(t_index)+"_col_"+str(col_index)+".txt", "wb") as binary_file:
                     binary_file.write(self.bufferpool[index].tail_page[t_index].physical_page[col_index].data)
@@ -101,7 +65,7 @@ class BufferPool:
         
     def disk_to_memory(self, table_name, page_range):
         #os.chdir(self.path)
-        print("Disk to memory: ", page_range)
+        #print("Disk to memory: ", page_range)
         f = open(table_name + "_" + str(page_range) + "_page_range_meta.pickle", "rb")
         page_range_metadata = pickle.load(f)
         f.close()
@@ -113,53 +77,25 @@ class BufferPool:
         #print("Disk to memory: ", return_page_range.meta.merge_time)
         for b_index in range(page_range_metadata.next_bpage):
             return_page_range.base_page.append(Base_Page(return_page_range.meta.n_columns))
-            f = open(table_name + "_" + str(page_range) + "_basemeta.pickle", "rb")
+            f = open(table_name + "_" + str(page_range)  + "_base_"+ str(b_index) + "_meta.pickle", "rb")
             b_metadata = pickle.load(f)
             return_page_range.base_page[b_index].meta_data = b_metadata
             f.close()
-            #new
-            f = open(table_name+"_"+str(page_range)+"_base_meta_RID.txt","rb")
-            return_page_range.base_page[b_index].meta_data.RID = f.read()
-            f.close()
-            f = open(table_name+"_"+str(page_range)+"_base_meta_SCHEMA.txt","rb")
-            return_page_range.base_page[b_index].meta_data.SCHEMA = f.read()
-            f.close()
-            f = open(table_name+"_"+str(page_range)+"_base_meta_INDIRECTION.txt","rb")
-            return_page_range.base_page[b_index].meta_data.INDIRECTION = f.read()
-            f.close()
-            f = open(table_name+"_"+str(page_range)+"_base_meta_TIMESTAMP.txt","rb")
-            return_page_range.base_page[b_index].meta_data.TIMESTAMP = f.read()
-            f.close()
-            #end
             for col_index in range(page_range_metadata.n_columns):
                 #return_page_range.base_page[b_index].physical_page.append(Base_Page.Physical_Page())
                 f = open(table_name + "_" + str(page_range) + "_basepage_" + str(b_index) + "_col_" + str(col_index) + ".txt", "rb")
-                return_page_range.base_page[b_index].physical_page[col_index].data = f.read()
+                return_page_range.base_page[b_index].physical_page[col_index].data = bytearray(f.read())
                 return_page_range.base_page[b_index].physical_page[col_index].num_records = return_page_range.base_page[b_index].meta_data.num_records
                 f.close()
         for t_index in range(page_range_metadata.next_tpage):
             return_page_range.tail_page.append(Tail_Page(return_page_range.meta.n_columns))
-            f = open(table_name + "_" + str(page_range) + "_tailmeta.pickle", "rb")
+            f = open(table_name + "_" + str(page_range)  + "_tail_"+ str(t_index) + "_meta.pickle", "rb")
             t_metadata = pickle.load(f)
             return_page_range.tail_page[t_index].meta_data = t_metadata
             f.close()
-            #new
-            f = open(table_name+"_"+str(page_range)+"_tail_meta_RID.txt","rb")
-            return_page_range.tail_page[t_index].meta_data.RID = f.read()
-            f.close()
-            f = open(table_name+"_"+str(page_range)+"_tail_meta_TID.txt","rb")
-            return_page_range.tail_page[t_index].meta_data.TID = f.read()
-            f.close()
-            f = open(table_name+"_"+str(page_range)+"_tail_meta_INDIRECTION.txt","rb")
-            return_page_range.tail_page[t_index].meta_data.INDIRECTION = f.read()
-            f.close()
-            f = open(table_name+"_"+str(page_range)+"_tail_meta_TIMESTAMP.txt","rb")
-            return_page_range.tail_page[t_index].meta_data.TIMESTAMP = f.read()
-            f.close()
-            #end
             for col_index in range(page_range_metadata.n_columns):
                 f = open(table_name + "_" + str(page_range) + "_tailpage_" + str(t_index) + "_col_" + str(col_index) + ".txt", "rb")
-                return_page_range.tail_page[t_index].physical_page[col_index].data = f.read()
+                return_page_range.tail_page[t_index].physical_page[col_index].data = bytearray(f.read())
                 return_page_range.tail_page[t_index].physical_page[col_index].num_records = return_page_range.tail_page[t_index].meta_data.num_records
                 f.close()
         return return_page_range
