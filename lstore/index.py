@@ -7,15 +7,13 @@ from xmlrpc.client import MAXINT
 class Index:
 
     def __init__(self, table):
-        # One index for each table. All our empty initially.
-        self.indices = [None] *  table.num_columns
-        # rid count
-        self.indices[table.key] = {}
-        
-        #use for get_table
         self.table_name = table.name
         self.table_num_columns = table.num_columns
         self.table_key = table.key
+        # One index for each table. All our empty initially.
+        self.indices = [None] *  table.num_columns
+        # Table.key is column 0, right?
+        self.indices[0] = {}
 
     """
     # returns the location of all records with the given value on column "column"
@@ -47,7 +45,12 @@ class Index:
     """
 
     def create_index(self, column):
-        self.indices[column] = {}
+        # Already created
+        if self.indices[column]:
+            return
+        else:
+            # The maximum number of keys in a record
+            self.indices[column] = {}
 
     """
     # optional: Drop index of specific column
@@ -66,6 +69,8 @@ class Index:
                 col_dict[value].append(rid)
             else:
                 col_dict[value] = [rid]
+        else:
+            print("The index for column", column, "has not been created.")
 
 
     """ 
@@ -78,6 +83,9 @@ class Index:
                 del col_dict[value]
             else:
                 col_dict[value].remove(rid)
+        else:
+            print("Delete index failed. The value cannot been found.")
+
 
     """ 
     # Update record with this
