@@ -75,18 +75,29 @@ class Page_Range:
         index = int((trid - self.meta.trid_list[page_block]) % PHYSICAL_PAGE_SIZE)
         return [page_index, index]
 
+    def b_read_index_col(self, page_index, index, i):
+        indirection = self.base_page[page_index].meta_data.read_INDIRECTION(index)
+        tps = self.base_page[page_index].meta_data.read_TPS()
+        record = None
+        if self.base_page[page_index].meta_data.read_RID(index) == indirection or indirection < tps:
+            record = self.b_read_col(page_index, index, i)
+        else:
+            new_loc = self.base_page[page_index].meta_data.read_INDIRECTION(index)
+            [new_page_index, new_index] = self.t_locate(new_loc)
+            if self.base_page[page_index].meta_data.read_bit(i, index) == 1:
+                record = self.t_read_col(new_page_index, new_index, i)
+            else:
+                record = self.b_read_col(page_index, index, i)
+        return record
+
     def b_read(self, page_index, index):
         record = []
         indirection = self.base_page[page_index].meta_data.read_INDIRECTION(index)
         tps = self.base_page[page_index].meta_data.read_TPS()
-        #print(indirection)
-        #print(tps)
         if self.base_page[page_index].meta_data.read_RID(index) == indirection or indirection < tps:
-            #print("Read from base page")
             for i in range(0, self.meta.n_columns):
                 record.append(self.b_read_col(page_index, index, i))
         else:
-            #print("Read from tail page")
             new_loc = self.base_page[page_index].meta_data.read_INDIRECTION(index)
             [new_page_index, new_index] = self.t_locate(new_loc)
             for i in range(0, self.meta.n_columns):

@@ -74,6 +74,7 @@ class Table:
             temp_page_range.base_page[i].meta_data.TPS = page_range_copy.base_page[i].meta_data.TPS
             temp_page_range.base_page[i].meta_data.merge_time += 1
         temp_page_range.dirty = 1
+        temp_page_range.pin -= 1
         self.lock.release()
         #print("Thread is done")
 

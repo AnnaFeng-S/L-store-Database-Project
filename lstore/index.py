@@ -10,10 +10,9 @@ class Index:
         self.table_name = table.name
         self.table_num_columns = table.num_columns
         self.table_key = table.key
-        # One index for each table. All our empty initially.
+        self.table = table
         self.indices = [None] *  table.num_columns
-        # Table.key is column 0, right?
-        self.indices[0] = {}
+        self.indices[self.table_key] = {}
 
     """
     # returns the location of all records with the given value on column "column"
@@ -46,11 +45,33 @@ class Index:
 
     def create_index(self, column):
         # Already created
-        if self.indices[column]:
+        if self.indices[column] is not None:
             return
         else:
-            # The maximum number of keys in a record
             self.indices[column] = {}
+            # Get all keys
+            key_list = self.indices[self.table_key].keys()
+            for key in key_list:
+                rid = self.indices[self.table_key][key][0]
+                [Page_Range, Page, Row] = self.table.directory[rid]
+                if [self.table.name, Page_Range] in self.table.bufferpool.bufferpool_list:
+                    temp_page_range = self.table.bufferpool.bufferpool[
+                        self.table.bufferpool.bufferpool_list.index([self.table.name, Page_Range])]
+                elif self.table.bufferpool.has_capacity() == True:
+                    self.table.bufferpool.bufferpool_list.append([self.table.name, Page_Range])
+                    temp_page_range = self.table.bufferpool.disk_to_memory(self.table.name, Page_Range)
+                    self.table.bufferpool.bufferpool.append(temp_page_range)
+                else:
+                    temp_index = self.table.bufferpool.min_used_time()
+                    #if self.table.bufferpool.bufferpool[temp_index].dirty == 1:
+                    self.table.bufferpool.memory_to_disk(temp_index)
+                    temp_page_range = self.table.bufferpool.disk_to_memory(self.table.name, Page_Range)
+                    self.table.bufferpool.bufferpool_list[temp_index] = [self.table.name, Page_Range]
+                    self.table.bufferpool.bufferpool[temp_index] = temp_page_range
+                self.table.lock.acquire()
+                record = temp_page_range.b_read_index_col(Page, Row, column)
+                self.table.lock.release()
+                self.insert(column, record, rid)
 
     """
     # optional: Drop index of specific column

@@ -16,7 +16,7 @@ class BufferPool:
     def min_used_time(self):
         Min = float("inf")
         for page in self.bufferpool:
-            if page.used_time < Min:
+            if page.used_time < Min and page.pin == 0:
                 Min = page.used_time
                 return_value = self.bufferpool.index(page)
         return return_value
@@ -153,6 +153,7 @@ class Database():
             pickle.dump(table.directory,f)
             os.path.join(table.name+'_directory')
             f.close()
+            table.index.table = None
             f = open(table.name+'_index','wb')
             pickle.dump(table.index,f)
             os.path.join(table.name+'_index')
@@ -190,6 +191,7 @@ class Database():
         f.close()
         table = Table(name, index.table_num_columns, index.table_key, self.pool, self.bufferpool)
         table.index = index
+        table.index.table = table
         f = open(name+'_directory','rb')
         directory = pickle.load(f)
         f.close()
