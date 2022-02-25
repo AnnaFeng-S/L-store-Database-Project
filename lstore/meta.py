@@ -8,6 +8,7 @@ class Base_Meta:
         self.num_records = 0
         self.merge_time = 0
         self.TPS = 0
+        self.LUTIME = None
 
     def has_capacity(self):
         if self.num_records == 512:
@@ -62,6 +63,12 @@ class Base_Meta:
 
     def update_TPS(self, new_TPS):
         self.TPS = new_TPS
+    
+    def create_LUTIME(self):
+        self.LUTIME = bytearray(4096)
+
+    def update_LUTIME(self, index, LUTIME):
+        self.LUTIME[index * 8: index * 8 + 8] = LUTIME.to_bytes(8, byteorder='big')
 
 
 class Tail_Meta:

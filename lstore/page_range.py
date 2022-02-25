@@ -157,6 +157,7 @@ class Page_Range:
         indirection = self.base_page[page_index].meta_data.read_INDIRECTION(index)
         while indirection != ori_rid:
             [new_page_index, new_index] = self.t_locate(indirection)
+            self.tail_page[new_page_index].meta_data.dirty = 1
             self.tail_page[new_page_index].meta_data.update_TID(new_index, SPECIAL_RID)
             indirection = self.tail_page[new_page_index].meta_data.read_INDIRECTION(new_index)
 
@@ -171,6 +172,7 @@ class Page_Range:
 
     def base_page_merge(self, base_page_index):
         num_records = self.base_page[base_page_index].meta_data.read_num_record()
+        self.base_page[base_page_index].meta_data.create_LUTIME()
         for index in range(0, num_records):
             rid = self.base_page[base_page_index].meta_data.read_RID(index)
             indirection = self.base_page[base_page_index].meta_data.read_INDIRECTION(index)
@@ -184,8 +186,6 @@ class Page_Range:
                     if condition == 1:
                         temp_data = self.t_read_col(new_page_index, new_index, column_index)
                         self.b_update(base_page_index, index, column_index, temp_data)
-        #if (base_page_index == 1):
-            #print("Merge Times: ", self.base_page[base_page_index].meta_data.merge_time)
-            #print("TRID_List = ", self.meta.trid_list)
+                self.base_page[base_page_index].meta_data.update_LUTIME(index, int(time.time()))
         base_tid = self.base_page[base_page_index].meta_data.merge_time
         self.base_page[base_page_index].meta_data.update_TPS(base_tid + (self.meta.tail_block_size * PHYSICAL_PAGE_SIZE))

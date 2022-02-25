@@ -6,6 +6,7 @@ class Base_Page:
     def __init__(self, num_columns):
         self.meta_data = Base_Meta(num_columns)
         self.physical_page = []
+        self.dirty = 0
         for i in range(0, num_columns):
             self.physical_page.append(Page())
 
@@ -30,6 +31,7 @@ class Tail_Page:
     def __init__(self, num_columns):
         self.physical_page = []
         self.meta_data = Tail_Meta()
+        self.dirty = 0
         for i in range(0, num_columns):
             self.physical_page.append(Page())
 

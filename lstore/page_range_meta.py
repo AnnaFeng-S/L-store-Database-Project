@@ -7,3 +7,5 @@ class Page_Range_Meta:
         self.next_trid = trid
         self.trid_list = [trid]
         self.tail_block_size = tail_block_size
+        self.Last_saved_base = 0
+        self.Last_saved_tail = 0

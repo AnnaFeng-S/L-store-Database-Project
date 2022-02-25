@@ -33,7 +33,7 @@ class Table:
     :param key: int             #Index of table key in columns
     """
 
-    def __init__(self, name, num_columns, key, pool, lock, bufferpool):
+    def __init__(self, name, num_columns, key, pool, bufferpool):
         self.name = name
         self.key = key
         self.num_columns = num_columns
@@ -42,7 +42,7 @@ class Table:
         self.page_range_list = []
         self.rid = 0
         self.pool = pool
-        self.lock = lock
+        self.lock = threading.Lock()
         self.bufferpool = bufferpool
         pass
 
@@ -64,14 +64,18 @@ class Table:
             self.bufferpool.bufferpool_list[temp_index] = [self.name, Page_Range]
             self.bufferpool.bufferpool[temp_index] = temp_page_range
             temp_page_range.pin += 1
+        #print("Merge Page Range: " + str(Page_Range))
         page_range_copy = copy.deepcopy(temp_page_range)
+        # Print Meta Information of Page Range
         num_updated = page_range_copy.merge()
+        self.lock.acquire()
         for i in range(num_updated):
             temp_page_range.base_page[i].physical_page = page_range_copy.base_page[i].physical_page
             temp_page_range.base_page[i].meta_data.TPS = page_range_copy.base_page[i].meta_data.TPS
             temp_page_range.base_page[i].meta_data.merge_time += 1
         temp_page_range.dirty = 1
-
+        self.lock.release()
+        #print("Thread is done")
 
     def new_page_range(self):
         # print("New Page Range")
