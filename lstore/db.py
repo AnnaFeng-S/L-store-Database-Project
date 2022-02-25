@@ -158,8 +158,7 @@ class Database():
             os.path.join(table.name+'_index')
             f.close()
         for i in range(len(self.bufferpool.bufferpool)):
-            if self.bufferpool.bufferpool[i].dirty == 1:
-                self.bufferpool.memory_to_disk(i)
+            self.bufferpool.memory_to_disk(i)
 
 
     """
