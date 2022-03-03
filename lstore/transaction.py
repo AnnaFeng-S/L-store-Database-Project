@@ -1,5 +1,7 @@
 from lstore.table import Table, Record
 from lstore.index import Index
+from lstore.log import Log
+SPECIAL_RID = (2 ** 64) - 1
 
 class Transaction:
 
@@ -8,6 +10,9 @@ class Transaction:
     """
     def __init__(self):
         self.queries = []
+        self.table = []
+        self.table_list = []
+        self.current_thread_id = 0
         pass
 
     """
@@ -17,22 +22,70 @@ class Transaction:
     # t = Transaction()
     # t.add_query(q.update, grades_table, 0, *[None, 1, None, 2, None])
     """
-    def add_query(self, table, query, *args):
+    def add_query(self, query, table, *args):
         self.queries.append((query, args))
+        if table not in self.table:
+            self.table.append(table)
+        self.table_list.append(self.table.index(table))
         # use grades_table for aborting
 
     # If you choose to implement this differently this method must still return True if transaction commits or False on abort
     def run(self):
-        for query, args in self.queries:
+        for i in len(self.queries):
+            query, args = self.queries[i]
             result = query(*args)
             # If the query has failed the transaction should abort
             if result == False:
-                return self.abort()
+                return self.abort(i)
         return self.commit()
 
-    def abort(self):
-        #TODO: do roll-back and any other necessary operations
-        return False
+    def abort(self,index):
+        index_list = []
+        for i in range(len(self.table[0].log.Xact_id)):
+            if self.current_thread_id == self.table[0].log.Xact_id[i]:
+                index_list.append(i)
+        for i in range(index):
+            query, args = self.queries[index-i]
+            temp_table = self.table[self.table_list[index-i]]
+            log = temp_table.log
+            temp_index = index_list[len(index_list)-1-i]
+            [Page_Range, Page, Row] = log.method_information[temp_index]
+            method_meta = log.method_meta[temp_index]
+            if [temp_table.name,Page_Range] in temp_table.bufferpool.bufferpool_list:
+                temp_page_range = temp_table.bufferpool.bufferpool[
+                    temp_table.bufferpool.bufferpool_list.index([temp_table.name, Page_Range])]
+            elif temp_table.bufferpool.has_capacity() == True:
+                temp_table.bufferpool.bufferpool_list.append([temp_table.name, Page_Range])
+                temp_page_range = temp_table.bufferpool.disk_to_memory(temp_table.name, Page_Range)
+                temp_table.bufferpool.bufferpool.append(temp_page_range)
+            else:
+                temp_index = temp_table.bufferpool.min_used_time()
+                temp_table.bufferpool.memory_to_disk(temp_index)
+                temp_page_range = temp_table.bufferpool.disk_to_memory(temp_table.name, Page_Range)
+                temp_table.bufferpool.bufferpool_list[temp_index] = [temp_table.name, Page_Range]
+                temp_table.bufferpool.bufferpool[temp_index] = temp_page_range
+            #method: insert：0，delete:1,update:2,sum/select:3
+            if len(args) == 1:
+                if type(args[0]) == list:
+                    #insert
+                    ori_rid = temp_page_range.base_page[Page].meta_data.read_RID(Row)
+                    temp_page_range.base_page[Page].meta_data.update_RID(Row,SPECIAL_RID)
+                    temp_table.directory.pop(ori_rid)
+                else:
+                    #delete
+                    #[rid,page,row]
+                    temp_page_range.base_page[Page].meta_data.update_RID(Row, method_meta[0][0])
+                    temp_table.directory[method_meta[0][0]] = [Page_Range, Page, Row]
+                    for k in range(1,len(method_meta)):
+                        [rid, page, row] = method_meta(k)
+                        temp_page_range.tail_page[page].meta_data.update_RID(row,rid)       
+            elif len(args) == 2:
+                #update
+                pass
+            else:
+                #sum, select
+                pass
+            return False
 
     def commit(self):
         # TODO: commit to database
