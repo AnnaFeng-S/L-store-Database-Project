@@ -17,7 +17,7 @@ records = {}
 
 number_of_records = 1000
 number_of_transactions = 100
-num_threads = 8
+num_threads = 1
 
 # create index on the non primary columns
 try:
@@ -61,7 +61,6 @@ for i in range(num_threads):
 # wait for workers to finish
 for i in range(num_threads):
     transaction_workers[i].join()
-
 
 # Check inserted records using select query in the main thread outside workers
 for key in keys:
