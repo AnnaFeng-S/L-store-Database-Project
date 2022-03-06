@@ -33,20 +33,23 @@ class Table:
     :param key: int             #Index of table key in columns
     """
 
-    def __init__(self, name, num_columns, key, pool, bufferpool):
+    def __init__(self, name, num_columns, key, pool, bufferpool, Log):
         self.name = name
         self.key = key
         self.num_columns = num_columns
         self.directory = {}
+        self.rid = 0
         self.index = Index(self)
         self.page_range_list = []
-        self.rid = 0
+        self.page_range_num = 0
         self.pool = pool
         self.lock = threading.Lock()
         self.bufferpool = bufferpool
+        self.log = Log
         pass
 
     def __merge(self, Page_Range):
+        self.lock.acquire()
         if [self.name, Page_Range] in self.bufferpool.bufferpool_list:
             temp_page_range = self.bufferpool.bufferpool[
                 self.bufferpool.bufferpool_list.index([self.name, Page_Range])]
@@ -65,8 +68,8 @@ class Table:
             self.bufferpool.bufferpool[temp_index] = temp_page_range
             temp_page_range.pin += 1
         #print("Merge Page Range: " + str(Page_Range))
+        self.lock.release()
         page_range_copy = copy.deepcopy(temp_page_range)
-        # Print Meta Information of Page Range
         num_updated = page_range_copy.merge()
         self.lock.acquire()
         for i in range(num_updated):
@@ -83,6 +86,7 @@ class Table:
         self.page_range_list.append(
             Page_Range(self.num_columns, self.rid, (self.rid + BASE_PAGE_RECORD), TAIL_PAGE_BLOCK_SIZE))
         self.rid += PAGE_RANGE_RECORD
+        self.page_range_num += 1
         pass
 
     def new_tail_page(self, page_range):

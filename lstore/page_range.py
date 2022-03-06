@@ -16,6 +16,7 @@ class Page_Range:
         self.used_time = 0
         self.dirty = 0
         self.pin = 0
+        #self.lock_manager = lock_manager
 
     def has_capacity(self):
         if len(self.base_page) == BASE_PAGE_MAX_SIZE and not (self.base_page[15].has_capacity()):

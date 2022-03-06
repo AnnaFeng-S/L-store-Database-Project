@@ -10,6 +10,8 @@ class Index:
         self.table_name = table.name
         self.table_num_columns = table.num_columns
         self.table_key = table.key
+        self.table_rid = table.rid
+        self.table_page_range = 0
         self.table = table
         self.indices = [None] *  table.num_columns
         self.indices[self.table_key] = {}
@@ -54,6 +56,7 @@ class Index:
             for key in key_list:
                 rid = self.indices[self.table_key][key][0]
                 [Page_Range, Page, Row] = self.table.directory[rid]
+                self.table.lock.acquire()
                 if [self.table.name, Page_Range] in self.table.bufferpool.bufferpool_list:
                     temp_page_range = self.table.bufferpool.bufferpool[
                         self.table.bufferpool.bufferpool_list.index([self.table.name, Page_Range])]
@@ -68,7 +71,6 @@ class Index:
                     temp_page_range = self.table.bufferpool.disk_to_memory(self.table.name, Page_Range)
                     self.table.bufferpool.bufferpool_list[temp_index] = [self.table.name, Page_Range]
                     self.table.bufferpool.bufferpool[temp_index] = temp_page_range
-                self.table.lock.acquire()
                 record = temp_page_range.b_read_index_col(Page, Row, column)
                 self.table.lock.release()
                 self.insert(column, record, rid)

@@ -3,6 +3,7 @@ from lstore.index import Index
 from lstore.page import Page
 from lstore.db import Database
 import pickle
+import threading
 
 
 class Query:
@@ -29,6 +30,7 @@ class Query:
         if rids is None:
             return False
         rid = rids[0]
+        self.table.lock.acquire()
         [Page_Range, Page, Row] = self.table.directory[rid]
         if [self.table.name, Page_Range] in self.table.bufferpool.bufferpool_list:
             temp_page_range = self.table.bufferpool.bufferpool[
@@ -47,6 +49,21 @@ class Query:
             self.table.bufferpool.bufferpool[temp_index] = temp_page_range
             temp_page_range.pin += 1
         records = temp_page_range.b_read(Page, Row)
+        self.table.lock.release()
+        #add log information
+        self.table.log.log_num += 1
+        self.table.log.method.append(1)
+        self.table.log.Xact_id.append(threading.currentThread().ident)
+        self.table.log.table_name.append(self.table.name)
+        self.table.log.method_information.append([Page_Range, Page, Row])
+        rid_list = [rid,Page,Row]
+        indirection = temp_page_range.base_page[Page].meta_data.read_INDIRECTION(Row)
+        while rid != indirection:
+            [new_page_index, new_index] = temp_page_range.t_locate(indirection)
+            rid_list.append([indirection,new_page_index, new_index])
+            indirection = temp_page_range.tail_page[new_page_index].meta_data.read_INDIRECTION(new_index)
+        self.table.log.method_meta.append(rid_list)
+         
         temp_page_range.b_delete(Page, Row)
         temp_page_range.used_time += 1
         temp_page_range.base_page[Page].dirty = 1
@@ -65,17 +82,15 @@ class Query:
 
     def insert(self, *columns):
         check = 0
-        if self.table.rid == 0:
-            self.table.new_page_range()
-            check = 1
-        elif self.table.page_range_list[-1].has_capacity() == False:
+        self.table.lock.acquire()
+        if self.table.page_range_num == 0:
             self.table.new_page_range()
             check = 1
         if check == 1:
             if self.table.bufferpool.has_capacity() == True:
                 self.table.bufferpool.bufferpool.append(self.table.page_range_list[-1])
                 self.table.bufferpool.bufferpool_list.append([self.table.name, len(self.table.page_range_list) - 1])
-                temp_page_range = self.table.bufferpool.bufferpool[-1]
+                temp_page_range = self.table.page_range_list[-1]
             else:
                 temp_index = self.table.bufferpool.min_used_time()
                 self.table.bufferpool.memory_to_disk(temp_index)
@@ -83,11 +98,10 @@ class Query:
                 self.table.bufferpool.bufferpool_list[temp_index] = [self.table.name, len(self.table.page_range_list) - 1]
                 temp_page_range = self.table.bufferpool.bufferpool[temp_index]
         else:
-            Page_Range = len(self.table.page_range_list) - 1
+            Page_Range = self.table.page_range_num - 1
             if [self.table.name, Page_Range] in self.table.bufferpool.bufferpool_list:
                 temp_page_range = self.table.bufferpool.bufferpool[
                     self.table.bufferpool.bufferpool_list.index([self.table.name, Page_Range])]
-                
             elif self.table.bufferpool.has_capacity() == True:
                 self.table.bufferpool.bufferpool_list.append([self.table.name, Page_Range])
                 temp_page_range = self.table.bufferpool.disk_to_memory(self.table.name, Page_Range)
@@ -98,14 +112,35 @@ class Query:
                 temp_page_range = self.table.bufferpool.disk_to_memory(self.table.name, Page_Range)
                 self.table.bufferpool.bufferpool_list[temp_index] = [self.table.name, Page_Range]
                 self.table.bufferpool.bufferpool[temp_index] = temp_page_range
+        if temp_page_range.has_capacity() == False:
+            if self.table.bufferpool.has_capacity() == True:
+                self.table.new_page_range()
+                self.table.bufferpool.bufferpool_list.append([self.table.name, self.table.page_range_num - 1])
+                self.table.bufferpool.bufferpool.append(self.table.page_range_list[-1])
+                temp_page_range = self.table.page_range_list[-1]
+            else:
+                temp_index = self.table.bufferpool.min_used_time()
+                self.table.bufferpool.memory_to_disk(temp_index)
+                self.table.new_page_range()
+                self.table.bufferpool.bufferpool_list[temp_index] = [self.table.name, self.table.page_range_num - 1]
+                self.table.bufferpool.bufferpool[temp_index] = self.table.page_range_list[-1]
+                temp_page_range = self.table.page_range_list[-1]
         temp_page_range.pin += 1
+        self.table.lock.release()
         [rid, page_index, index] = temp_page_range.b_write(columns)
+        #add log information
+        self.table.log.log_num += 1
+        self.table.log.method.append(0)
+        self.table.log.Xact_id.append(threading.currentThread().ident)
+        self.table.log.table_name.append(self.table.name)
+        self.table.log.method_information.append([self.table.page_range_num-1, page_index, index])
+        self.table.log.method_meta.append([])
+        
         temp_page_range.base_page[page_index].dirty = 1
         for i in range(len(columns)):
             if self.table.index.indices[i] is not None:
                 self.table.index.insert(i, columns[i], rid)
-        recordssss = temp_page_range.b_read(page_index, index)
-        self.table.directory[rid] = [len(self.table.page_range_list) - 1, page_index, index]
+        self.table.directory[rid] = [self.table.page_range_num - 1, page_index, index]
         temp_page_range.used_time += 1
         temp_page_range.pin -= 1
         return True
@@ -123,8 +158,9 @@ class Query:
         rids = self.table.index.locate(column, index_key)
         return_list = []
         if rids is None:
-            return False
+            return return_list
         for rid in rids:
+            self.table.lock.acquire()
             [Page_Range, Page, Row] = self.table.directory[rid]
             if [self.table.name, Page_Range] in self.table.bufferpool.bufferpool_list:
                 temp_page_range = self.table.bufferpool.bufferpool[
@@ -143,9 +179,16 @@ class Query:
                 self.table.bufferpool.bufferpool[temp_index] = temp_page_range
                 temp_page_range.pin += 1
             temp_page_range.used_time += 1
-            self.table.lock.acquire()
             record = temp_page_range.b_read(Page, Row)
             self.table.lock.release()
+            #add log information
+            self.table.log.log_num += 1
+            self.table.log.method.append(3)
+            self.table.log.Xact_id.append(threading.currentThread().ident)
+            self.table.log.table_name.append(self.table.name)
+            self.table.log.method_information.append([Page_Range, Page, Row])
+            self.table.log.method_meta.append([])
+            
             columns = []
             for i in range(self.table.num_columns):
                 if query_columns[i] == 1:
@@ -167,6 +210,7 @@ class Query:
         if rids is None:
             return False
         rid = rids[0]
+        self.table.lock.acquire()
         [Page_Range, Page, Row] = self.table.directory[rid]
         if [self.table.name, Page_Range] in self.table.bufferpool.bufferpool_list:
             temp_page_range = self.table.bufferpool.bufferpool[
@@ -186,6 +230,7 @@ class Query:
             self.table.bufferpool.bufferpool[temp_index] = temp_page_range
             temp_page_range.pin += 1
         temp_page_range.used_time += 1
+        self.table.lock.release()
         if (temp_page_range.tail_has_capacity() == False):
             self.table.new_tail_page(Page_Range)
         temp_page_range.base_page[Page].dirty = 1
@@ -197,6 +242,14 @@ class Query:
                     self.table.index.update(i, old_values[i], columns[i], rid)
         temp_page_range.tail_page[-1].dirty = 1
         temp_page_range.pin -= 1
+        #add log information
+        #need implement
+        self.table.log.log_num += 1
+        self.table.log.method.append(2)
+        self.table.log.Xact_id.append(threading.currentThread().ident)
+        self.table.log.table_name.append(self.table.name)
+        self.table.log.method_information.append([Page_Range, len(temp_page_range.tail_page)-1, Row])
+        self.table.log.method_meta.append(rid_list)
         return True
 
     """
@@ -215,6 +268,7 @@ class Query:
         return_sum = 0
         for rid in rids:
             [Page_Range, Page, Row] = self.table.directory[rid]
+            self.table.lock.acquire()
             if [self.table.name, Page_Range] in self.table.bufferpool.bufferpool_list:
                 temp_page_range = self.table.bufferpool.bufferpool[
                     self.table.bufferpool.bufferpool_list.index([self.table.name, Page_Range])]
@@ -233,9 +287,16 @@ class Query:
                 self.table.bufferpool.bufferpool[temp_index] = temp_page_range
                 temp_page_range.pin += 1
             temp_page_range.used_time += 1
-            self.table.lock.acquire()
             record = temp_page_range.b_read(Page, Row)
+            #add log information
             self.table.lock.release()
+            self.table.log.log_num += 1
+            self.table.log.method.append(3)
+            self.table.log.Xact_id.append(threading.currentThread().ident)
+            self.table.log.table_name.append(self.table.name)
+            self.table.log.method_information.append([Page_Range, Page, Row])
+            self.table.log.method_meta.append([])
+            
             return_sum += record[aggregate_column_index]
             temp_page_range.pin -= 1
         return return_sum
