@@ -69,18 +69,38 @@ class Transaction:
                 if type(args[0]) == list:
                     #insert
                     ori_rid = temp_page_range.base_page[Page].meta_data.read_RID(Row)
-                    temp_page_range.base_page[Page].meta_data.update_RID(Row,SPECIAL_RID)
+                    temp_page_range.b_delete(Page, Row)
                     temp_table.directory.pop(ori_rid)
+                    temp_page_range.base_page[Page].meta_data.num_records -= 1
+                    for k in range(len(args[0])):
+                        value = args[0][k]
+                        if value is not None:
+                            temp_table.index.delete(k,value,ori_rid)
                 else:
                     #delete
                     #[rid,page,row]
-                    temp_page_range.base_page[Page].meta_data.update_RID(Row, method_meta[0][0])
-                    temp_table.directory[method_meta[0][0]] = [Page_Range, Page, Row]
+                    temp_page_range.base_page[Page].meta_data.update_RID(Row, method_meta[temp_index][0][0])
+                    temp_table.directory[method_meta[temp_index][0][0]] = [Page_Range, Page, Row]
                     for k in range(1,len(method_meta)):
-                        [rid, page, row] = method_meta(k)
-                        temp_page_range.tail_page[page].meta_data.update_RID(row,rid)       
+                        [rid, page, row] = method_meta[temp_index][k]
+                        temp_page_range.tail_page[page].meta_data.update_RID(row,rid)
+                    for k in range(temp_table.num_columns):
+                        if temp_table.index.indices[k] is not None:
+                            temp_table.index.insert(k, columns[k], rid)
             elif len(args) == 2:
                 #update
+                if len(method_meta[temp_index]) == 2:
+                    [brid, bpage, brow] = method_meta[temp_index][0]
+                    [trid, tpage, trow] = method_meta[temp_index][1]
+                    temp_page_range.base_page[bpage].meta_data.write_INDIRECTION(brid)
+                    temp_page_range.tail_page[tpage].meta_data.update_RID(trow,SPECIAL_RID)
+                elif len(method_meta[temp_index]) > 2:
+                    [brid, bpage, brow] = method_meta[temp_index][0]
+                    [trid1, tpage1, trow1] = method_meta[temp_index][-1]
+                    [trid2, tpage2, trow2] = method_meta[temp_index][-2]
+                    temp_page_range.tail_page[tpage1].meta_data.update_RID(trow1, SPECIAL_RID)
+                    temp_page_range.base_page[bpage].meta_data.write_INDIRECTION(trid2)
+                    temp_page_range.tail_page[tpage2].meta_data.write_INDIRECTION(brid)
                 pass
             else:
                 #sum, select
