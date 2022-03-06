@@ -1,6 +1,5 @@
 
 class Page:
-
     def __init__(self):
         self.num_records = 0
         self.data = bytearray(4096)
@@ -20,3 +19,4 @@ class Page:
 
     def update(self, index, value):
         self.data[index * 8: index * 8 + 8] = value.to_bytes(8, byteorder='big', signed=True)
+
