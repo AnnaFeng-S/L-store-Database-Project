@@ -52,10 +52,10 @@ class Query:
         #add log information
         self.table.log.log_num += 1;
         self.table.log.method.append(1)
-        self.table.log.Xact_id.append(#need implement)
+        self.table.log.Xact_id.append(threading.currentThread().ident)
         self.table.log.table_name.append(self.table.name)
         self.table.log.method_information.append([Page_Range, Page, Row])
-        rid_list = [rid,Page,Row]
+        rid_list = [[rid,Page,Row]]
         indirection = temp_page_range.base_page[Page].meta_data.read_INDIRECTION(Row)
         while rid != indirection:
             [new_page_index, new_index] = temp_page_range.t_locate(indirection)
@@ -130,7 +130,7 @@ class Query:
         #add log information
         self.table.log.log_num += 1;
         self.table.log.method.append(0)
-        self.table.log.Xact_id.append(#need implement)
+        self.table.log.Xact_id.append(threading.currentThread().ident)
         self.table.log.table_name.append(self.table.name)
         self.table.log.method_information.append([self.table.page_range_num-1, page_index, index])
         self.table.log.method_meta.append([])
@@ -183,7 +183,7 @@ class Query:
             #add log information
             self.table.log.log_num += 1;
             self.table.log.method.append(3)
-            self.table.log.Xact_id.append(#need implement)
+            self.table.log.Xact_id.append(threading.currentThread().ident)
             self.table.log.table_name.append(self.table.name)
             self.table.log.method_information.append([Page_Range, Page, Row])
             self.table.log.method_meta.append([])
@@ -242,12 +242,17 @@ class Query:
         temp_page_range.tail_page[-1].dirty = 1
         temp_page_range.pin -= 1
         #add log information
-        #need implement
         self.table.log.log_num += 1;
         self.table.log.method.append(2)
-        self.table.log.Xact_id.append(#need implement)
+        self.table.log.Xact_id.append(threading.currentThread().ident)
         self.table.log.table_name.append(self.table.name)
-        self.table.log.method_information.append([Page_Range, len(temp_page_range.tail_page)-1, Row])
+        self.table.log.method_information.append([Page_Range, Page, Row])
+        rid_list = [[rid,Page,Row]]
+        indirection = temp_page_range.base_page[Page].meta_data.read_INDIRECTION(Row)
+        while rid != indirection:
+            [new_page_index, new_index] = temp_page_range.t_locate(indirection)
+            rid_list.append([indirection,new_page_index, new_index])
+            indirection = temp_page_range.tail_page[new_page_index].meta_data.read_INDIRECTION(new_index)
         self.table.log.method_meta.append(rid_list)
         return True
 
@@ -291,7 +296,7 @@ class Query:
             self.table.lock.release()
             self.table.log.log_num += 1;
             self.table.log.method.append(3)
-            self.table.log.Xact_id.append(#need implement)
+            self.table.log.Xact_id.append(threading.currentThread().ident)
             self.table.log.table_name.append(self.table.name)
             self.table.log.method_information.append([Page_Range, Page, Row])
             self.table.log.method_meta.append([])
