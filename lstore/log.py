@@ -8,3 +8,4 @@ class Log:
         self.method_information = []
         #[RID,TID,...]
         self.method_meta = []
+        self.old_value = []

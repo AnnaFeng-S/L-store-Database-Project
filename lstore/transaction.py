@@ -1,6 +1,9 @@
 from lstore.table import Table, Record
 from lstore.index import Index
 from lstore.log import Log
+import threading
+import os
+import pickle
 SPECIAL_RID = (2 ** 64) - 1
 
 class Transaction:
@@ -12,7 +15,7 @@ class Transaction:
         self.queries = []
         self.table = []
         self.table_list = []
-        self.current_thread_id = 0
+        self.transaction_id = None
         pass
 
     """
@@ -40,9 +43,10 @@ class Transaction:
         return self.commit()
 
     def abort(self,index):
+        print('abort')
         index_list = []
         for i in range(len(self.table[0].log.Xact_id)):
-            if self.current_thread_id == self.table[0].log.Xact_id[i]:
+            if threading.currentThread().ident == self.table[0].log.Xact_id[i]:
                 index_list.append(i)
         for i in range(index):
             query, args = self.queries[index-i]
@@ -51,6 +55,7 @@ class Transaction:
             temp_index = index_list[len(index_list)-1-i]
             [Page_Range, Page, Row] = log.method_information[temp_index]
             method_meta = log.method_meta[temp_index]
+            old_value = log.old_value[temp_index]
             if [temp_table.name,Page_Range] in temp_table.bufferpool.bufferpool_list:
                 temp_page_range = temp_table.bufferpool.bufferpool[
                     temp_table.bufferpool.bufferpool_list.index([temp_table.name, Page_Range])]
@@ -79,39 +84,51 @@ class Transaction:
                 else:
                     #delete
                     #[rid,page,row]
-                    temp_page_range.base_page[Page].meta_data.update_RID(Row, method_meta[temp_index][0][0])
-                    temp_table.directory[method_meta[temp_index][0][0]] = [Page_Range, Page, Row]
+                    temp_page_range.base_page[Page].meta_data.update_RID(Row, method_meta[0][0])
+                    temp_table.directory[method_meta[0][0]] = [Page_Range, Page, Row]
                     for k in range(1,len(method_meta)):
-                        [rid, page, row] = method_meta[temp_index][k]
+                        [rid, page, row] = method_meta[k]
                         temp_page_range.tail_page[page].meta_data.update_RID(row,rid)
                     for k in range(temp_table.num_columns):
                         if temp_table.index.indices[k] is not None:
-                            temp_table.index.insert(k, columns[k], rid)
+                            temp_table.index.insert(k, temp_page_range.base_page[Page].read(Row,k), rid)
             elif len(args) == 2:
                 #update
-                if len(method_meta[temp_index]) == 2:
-                    [brid, bpage, brow] = method_meta[temp_index][0]
-                    [trid, tpage, trow] = method_meta[temp_index][1]
+                for k in range(temp_table.num_columns):
+                    if temp_table.index.indices[k] is not None:
+                        if args[1][k] is not None:
+                            self.table.index.update(k, args[1][k], old_value[k], method_meta[0][0])
+                if len(method_meta) == 2:
+                    [brid, bpage, brow] = method_meta[0]
+                    [trid, tpage, trow] = method_meta[1]
                     temp_page_range.base_page[bpage].meta_data.write_INDIRECTION(brid)
                     temp_page_range.tail_page[tpage].meta_data.update_RID(trow,SPECIAL_RID)
                 elif len(method_meta[temp_index]) > 2:
-                    [brid, bpage, brow] = method_meta[temp_index][0]
-                    [trid1, tpage1, trow1] = method_meta[temp_index][-1]
-                    [trid2, tpage2, trow2] = method_meta[temp_index][-2]
+                    [brid, bpage, brow] = method_meta[0]
+                    [trid1, tpage1, trow1] = method_meta[-1]
+                    [trid2, tpage2, trow2] = method_meta[-2]
                     temp_page_range.tail_page[tpage1].meta_data.update_RID(trow1, SPECIAL_RID)
-                    temp_page_range.base_page[bpage].meta_data.write_INDIRECTION(trid2)
                     temp_page_range.tail_page[tpage2].meta_data.write_INDIRECTION(brid)
-                pass
-            else:
-                #sum, select
-                pass
-            return False
+        #index = index_list[-1-i]
+        log = self.table[0].log
+        log.log_num -= 1
+        log.Xact_id = [log.Xact_id[i] for i in range(len(log.Xact_id)) if i not in index_list]
+        log.method = [log.method[i] for i in range(len(log.method)) if i not in index_list]
+        log.table_name = [log.table_name[i] for i in range(len(log.table_name)) if i not in index_list]
+        log.method_information = [log.method_information[i] for i in range(len(log.method_information)) if i not in index_list]
+        log.method_meta = [log.method_meta[i] for i in range(len(log.method_meta)) if i not in index_list]
+        log.old_value = [log.old_value[i] for i in range(len(log.old_value)) if i not in index_list]
+        return False
 
     def commit(self):
+        if len(self.queries) == 0:
+            return True
+        self.table[0].lock.acquire()
         index_list = []
         for i in range(len(self.table[0].log.Xact_id)):
-            if self.current_thread_id == self.table[0].log.Xact_id[i]:
+            if threading.currentThread().ident == self.table[0].log.Xact_id[i]:
                 index_list.append(i)
+        
         for i in range(len(self.queries)):
             query, args = self.queries[i]
             temp_table = self.table[self.table_list[i]]
@@ -119,24 +136,53 @@ class Transaction:
             temp_index = index_list[i]
             [Page_Range, Page, Row] = log.method_information[temp_index]
             method_meta = log.method_meta[temp_index]
-            if len(args) == 0:
+            if log.method[temp_index] == 0:
+                #insert
                 if [temp_table.name,Page_Range] in temp_table.bufferpool.bufferpool_list:
-                    f = open(self.bufferpool_list[Page_Range][0] + "_" + str(self.bufferpool_list[Page_Range][1]) + "_base_"+ str(Page) + "_meta.pickle", "wb")
-                    pickle.dump(self.bufferpool[Page_Range].base_page[Page].meta_data, f)
-                    os.path.join(self.path,self.bufferpool_list[Page_Range][0] + "_" + str(self.bufferpool_list[Page_Range][1]) + "_base_"+ str(Page) + "_meta.pickle")
+                    index = temp_table.bufferpool.bufferpool_list.index([temp_table.name,Page_Range])
+                    f = open(temp_table.bufferpool.bufferpool_list[index][0] + "_" + str(temp_table.bufferpool.bufferpool_list[index][1]) + "_base_"+ str(Page) + "_meta.pickle", "wb")
+                    pickle.dump(temp_table.bufferpool.bufferpool[index].base_page[Page].meta_data, f)
                     f.close()
-                    for col_index in range(len(self.bufferpool[Page_Range].base_page[Page].physical_page)):
-                        with open(self.bufferpool_list[Page_Range][0]+"_"+str(self.bufferpool_list[Page_Range][1])+"_basepage_"+str(Page)+"_col_"+str(col_index)+".txt", "wb") as binary_file:
-                            binary_file.write(self.bufferpool[Page_Range].base_page[Page].physical_page[col_index].data)
-                            os.path.join(self.path, self.bufferpool_list[Page_Range][0]+"_"+str(self.bufferpool_list[Page_Range][1])+"_basepage_"+str(Page)+"_col_"+str(col_index)+".txt")
-            elif len(args) == 2 or 1:
-                t_index = method_meta[1]
-                f = open(self.bufferpool_list[Page_Range][0] + "_" + str(self.bufferpool_list[Page_Range][1]) + "_tail_"+ str(t_index) + "_meta.pickle", "wb")
-                pickle.dump(self.bufferpool[Page_Range].tail_page[t_index].meta_data, f)
-                os.path.join(self.path,self.bufferpool_list[Page_Range][0] + "_" + str(self.bufferpool_list[Page_Range][1]) + "_tail_"+ str(t_index) + "_meta.pickle")
-                f.close()
-                for col_index in range(len(self.bufferpool[Page_Range].tail_page[t_index].physical_page)):
-                    with open(self.bufferpool_list[Page_Range][0]+"_"+str(self.bufferpool_list[Page_Range][1])+"_tailpage_"+str(t_index)+"_col_"+str(col_index)+".txt", "wb") as binary_file:
-                        binary_file.write(self.bufferpool[Page_Range].tail_page[t_index].physical_page[col_index].data)
-                        os.path.join(self.path, self.bufferpool_list[Page_Range][0]+"_"+str(self.bufferpool_list[Page_Range][1])+"_tailpage_"+str(t_index)+"_col_"+str(col_index)+".txt")
+                    for col_index in range(len(temp_table.bufferpool.bufferpool[index].base_page[Page].physical_page)):
+                        with open(temp_table.bufferpool.bufferpool_list[index][0]+"_"+str(temp_table.bufferpool.bufferpool_list[index][1])+"_basepage_"+str(Page)+"_col_"+str(col_index)+".txt", "wb") as binary_file:
+                            binary_file.write(temp_table.bufferpool.bufferpool[index].base_page[Page].physical_page[col_index].data)
+            elif log.method[temp_index] == 1:
+                #delete
+                if [temp_table.name,Page_Range] in temp_table.bufferpool.bufferpool_list:
+                    index = temp_table.bufferpool.bufferpool_list.index([temp_table.name,Page_Range])
+                    f = open(temp_table.bufferpool.bufferpool_list[index][0] + "_" + str(temp_table.bufferpool.bufferpool_list[index][1]) + "_base_"+ str(Page) + "_meta.pickle", "wb")
+                    pickle.dump(temp_table.bufferpool.bufferpool[index].base_page[Page].meta_data, f)
+                    f.close()
+                    for col_index in range(len(temp_table.bufferpool.bufferpool[index].base_page[Page].physical_page)):
+                        with open(temp_table.bufferpool.bufferpool_list[index][0]+"_"+str(temp_table.bufferpool.bufferpool_list[index][1])+"_basepage_"+str(Page)+"_col_"+str(col_index)+".txt", "wb") as binary_file:
+                            binary_file.write(temp_table.bufferpool.bufferpool[index].base_page[Page].physical_page[col_index].data)
+                    for i in range(len(method_meta)):
+                        Page = method_meta[i][1]
+                        f = open(temp_table.bufferpool.bufferpool_list[index][0] + "_" + str(temp_table.bufferpool.bufferpool_list[index][1]) + "_tail_"+ str(Page) + "_meta.pickle", "wb")
+                        pickle.dump(temp_table.bufferpool.bufferpool[index].tail_page[Page].meta_data, f)
+                        f.close()
+                        for col_index in range(len(temp_table.bufferpool.bufferpool[index].tail_page[Page].physical_page)):
+                            with open(temp_table.bufferpool.bufferpool_list[index][0]+"_"+str(temp_table.bufferpool.bufferpool_list[index][1])+"_tailpage_"+str(Page)+"_col_"+str(col_index)+".txt", "wb") as binary_file:
+                                binary_file.write(temp_table.bufferpool.bufferpool[index].tail_page[Page].physical_page[col_index].data)
+            elif log.method[temp_index] == 2:
+                #update
+                if [temp_table.name,Page_Range] in temp_table.bufferpool.bufferpool_list:
+                    index = temp_table.bufferpool.bufferpool_list.index([temp_table.name,Page_Range])
+                    Page = method_meta[-1][1]
+                    f = open(temp_table.bufferpool.bufferpool_list[index][0] + "_" + str(temp_table.bufferpool.bufferpool_list[index][1]) + "_tail_"+ str(Page) + "_meta.pickle", "wb")
+                    pickle.dump(temp_table.bufferpool.bufferpool[index].tail_page[Page].meta_data, f)
+                    f.close()
+                    for col_index in range(len(temp_table.bufferpool.bufferpool[index].tail_page[Page].physical_page)):
+                        with open(temp_table.bufferpool.bufferpool_list[index][0]+"_"+str(temp_table.bufferpool.bufferpool_list[index][1])+"_tailpage_"+str(Page)+"_col_"+str(col_index)+".txt", "wb") as binary_file:
+                            binary_file.write(temp_table.bufferpool.bufferpool[index].tail_page[Page].physical_page[col_index].data)
+
+        log = self.table[0].log
+        log.log_num -= 1
+        log.Xact_id = [log.Xact_id[i] for i in range(len(log.Xact_id)) if i not in index_list]
+        log.method = [log.method[i] for i in range(len(log.method)) if i not in index_list]
+        log.table_name = [log.table_name[i] for i in range(len(log.table_name)) if i not in index_list]
+        log.method_information = [log.method_information[i] for i in range(len(log.method_information)) if i not in index_list]
+        log.method_meta = [log.method_meta[i] for i in range(len(log.method_meta)) if i not in index_list]
+        log.old_value = [log.old_value[i] for i in range(len(log.old_value)) if i not in index_list]
+        self.table[0].lock.release()
         return True
