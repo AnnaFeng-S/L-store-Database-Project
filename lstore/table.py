@@ -46,6 +46,7 @@ class Table:
         self.lock = threading.Lock()
         self.bufferpool = bufferpool
         self.log = Log
+        self.thread_id = threading.current_thread().ident
         pass
 
     def __merge(self, Page_Range):

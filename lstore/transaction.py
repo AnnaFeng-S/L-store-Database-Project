@@ -1,5 +1,6 @@
 from lstore.table import Table, Record
 from lstore.index import Index
+from lstore.lock_manager import LockManager
 from lstore.log import Log
 import threading
 import os
@@ -44,18 +45,15 @@ class Transaction:
 
     def abort(self,index):
         print('abort')
-        index_list = []
-        for i in range(len(self.table[0].log.Xact_id)):
-            if threading.currentThread().ident == self.table[0].log.Xact_id[i]:
-                index_list.append(i)
+        self.table[0].lock.acquire()
+        thread_id = threading.currentThread().ident
         for i in range(index):
             query, args = self.queries[index-i]
             temp_table = self.table[self.table_list[index-i]]
             log = temp_table.log
-            temp_index = index_list[len(index_list)-1-i]
-            [Page_Range, Page, Row] = log.method_information[temp_index]
-            method_meta = log.method_meta[temp_index]
-            old_value = log.old_value[temp_index]
+            [Page_Range, Page, Row] = log.method_information[thread_id][index-i]
+            method_meta = log.method_meta[thread_id][index-i]
+            old_value = log.old_value[thread_id][index-i]
             if [temp_table.name,Page_Range] in temp_table.bufferpool.bufferpool_list:
                 temp_page_range = temp_table.bufferpool.bufferpool[
                     temp_table.bufferpool.bufferpool_list.index([temp_table.name, Page_Range])]
@@ -111,32 +109,31 @@ class Transaction:
                     temp_page_range.tail_page[tpage2].meta_data.write_INDIRECTION(brid)
         #index = index_list[-1-i]
         log = self.table[0].log
-        log.log_num -= 1
-        log.Xact_id = [log.Xact_id[i] for i in range(len(log.Xact_id)) if i not in index_list]
-        log.method = [log.method[i] for i in range(len(log.method)) if i not in index_list]
-        log.table_name = [log.table_name[i] for i in range(len(log.table_name)) if i not in index_list]
-        log.method_information = [log.method_information[i] for i in range(len(log.method_information)) if i not in index_list]
-        log.method_meta = [log.method_meta[i] for i in range(len(log.method_meta)) if i not in index_list]
-        log.old_value = [log.old_value[i] for i in range(len(log.old_value)) if i not in index_list]
+        log.thread_id.remove(thread_id)
+        log.method.pop(thread_id)
+        log.table_name.pop(thread_id)
+        log.method_information.pop(thread_id)
+        log.method_meta.pop(thread_id)
+        log.old_value.pop(thread_id)
+        self.table[0].lock.release()
+        lock_manager = LockManager()
+        lock_manager.lock.acquire()
+        lock_manager.release_locks(threading.current_thread().ident)
+        lock_manager.lock.release()
         return False
 
     def commit(self):
         if len(self.queries) == 0:
             return True
         self.table[0].lock.acquire()
-        index_list = []
-        for i in range(len(self.table[0].log.Xact_id)):
-            if threading.currentThread().ident == self.table[0].log.Xact_id[i]:
-                index_list.append(i)
-        
+        thread_id = threading.currentThread().ident
         for i in range(len(self.queries)):
             query, args = self.queries[i]
             temp_table = self.table[self.table_list[i]]
             log = temp_table.log
-            temp_index = index_list[i]
-            [Page_Range, Page, Row] = log.method_information[temp_index]
-            method_meta = log.method_meta[temp_index]
-            if log.method[temp_index] == 0:
+            [Page_Range, Page, Row] = log.method_information[thread_id][i]
+            method_meta = log.method_meta[thread_id][i]
+            if log.method[thread_id][i] == 0:
                 #insert
                 if [temp_table.name,Page_Range] in temp_table.bufferpool.bufferpool_list:
                     index = temp_table.bufferpool.bufferpool_list.index([temp_table.name,Page_Range])
@@ -146,7 +143,7 @@ class Transaction:
                     for col_index in range(len(temp_table.bufferpool.bufferpool[index].base_page[Page].physical_page)):
                         with open(temp_table.bufferpool.bufferpool_list[index][0]+"_"+str(temp_table.bufferpool.bufferpool_list[index][1])+"_basepage_"+str(Page)+"_col_"+str(col_index)+".txt", "wb") as binary_file:
                             binary_file.write(temp_table.bufferpool.bufferpool[index].base_page[Page].physical_page[col_index].data)
-            elif log.method[temp_index] == 1:
+            elif log.method[thread_id][i] == 1:
                 #delete
                 if [temp_table.name,Page_Range] in temp_table.bufferpool.bufferpool_list:
                     index = temp_table.bufferpool.bufferpool_list.index([temp_table.name,Page_Range])
@@ -164,7 +161,7 @@ class Transaction:
                         for col_index in range(len(temp_table.bufferpool.bufferpool[index].tail_page[Page].physical_page)):
                             with open(temp_table.bufferpool.bufferpool_list[index][0]+"_"+str(temp_table.bufferpool.bufferpool_list[index][1])+"_tailpage_"+str(Page)+"_col_"+str(col_index)+".txt", "wb") as binary_file:
                                 binary_file.write(temp_table.bufferpool.bufferpool[index].tail_page[Page].physical_page[col_index].data)
-            elif log.method[temp_index] == 2:
+            elif log.method[thread_id][i] == 2:
                 #update
                 if [temp_table.name,Page_Range] in temp_table.bufferpool.bufferpool_list:
                     index = temp_table.bufferpool.bufferpool_list.index([temp_table.name,Page_Range])
@@ -177,12 +174,15 @@ class Transaction:
                             binary_file.write(temp_table.bufferpool.bufferpool[index].tail_page[Page].physical_page[col_index].data)
 
         log = self.table[0].log
-        log.log_num -= 1
-        log.Xact_id = [log.Xact_id[i] for i in range(len(log.Xact_id)) if i not in index_list]
-        log.method = [log.method[i] for i in range(len(log.method)) if i not in index_list]
-        log.table_name = [log.table_name[i] for i in range(len(log.table_name)) if i not in index_list]
-        log.method_information = [log.method_information[i] for i in range(len(log.method_information)) if i not in index_list]
-        log.method_meta = [log.method_meta[i] for i in range(len(log.method_meta)) if i not in index_list]
-        log.old_value = [log.old_value[i] for i in range(len(log.old_value)) if i not in index_list]
+        log.thread_id.remove(thread_id)
+        log.method.pop(thread_id)
+        log.table_name.pop(thread_id)
+        log.method_information.pop(thread_id)
+        log.method_meta.pop(thread_id)
+        log.old_value.pop(thread_id)
         self.table[0].lock.release()
+        lock_manager = LockManager()
+        lock_manager.lock.acquire()
+        lock_manager.release_locks(threading.current_thread().ident)
+        lock_manager.lock.release()
         return True
