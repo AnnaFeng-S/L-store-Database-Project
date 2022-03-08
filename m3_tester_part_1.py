@@ -2,10 +2,12 @@ from lstore.db import Database
 from lstore.query import Query
 from lstore.transaction import Transaction
 from lstore.transaction_worker import TransactionWorker
-
+from time import process_time
 from random import choice, randint, sample, seed
 
 db = Database()
+db.open('./ECS165')
+
 # creating grades table
 grades_table = db.create_table('Grades', 5, 0)
 
@@ -26,6 +28,8 @@ try:
     grades_table.index.create_index(4)
 except Exception as e:
     print('Index API not implemented properly, tests may fail.')
+    
+select_time_0 = process_time()
 
 keys = []
 records = {}
@@ -71,11 +75,13 @@ for key in keys:
         if column != records[key][i]:
             error = True
     if error:
-        print('select error on', key, ':', record, ', correct:', records[key])
+        print('select error on', key, ':', record.columns, ', correct:', records[key])
     else:
         pass
         # print('select on', key, ':', record)
 print("Select finished")
 
+select_time_1 = process_time()
+print("Selecting 10k records took:  \t\t\t", select_time_1 - select_time_0)
 
 db.close()

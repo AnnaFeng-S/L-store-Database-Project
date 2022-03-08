@@ -6,6 +6,8 @@ from lstore.transaction_worker import TransactionWorker
 from random import choice, randint, sample, seed
 
 db = Database()
+db.open('./ECS165')
+
 # Getting the existing Grades table
 grades_table = db.get_table('Grades')
 
@@ -24,11 +26,13 @@ keys = []
 records = {}
 seed(3562901)
 
+'''
 # re-generate records for testing
 for i in range(0, number_of_records):
     key = 92106429 + i
     keys.append(key)
     records[key] = [key, randint(0, 20), randint(0, 20), randint(0, 20), randint(0, 20)]
+'''
 
 transaction_workers = []
 transactions = []
