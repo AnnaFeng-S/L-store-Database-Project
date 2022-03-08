@@ -111,6 +111,8 @@ class TransactionWorker:
         self.stats = []
         self.result = 0
         self._queue = queue.Queue()
+        self.transaction_index = 0
+        self.worker_thread = 0
         pass
 
     """
@@ -140,13 +142,16 @@ class TransactionWorker:
     def work(self):
         while 1:
             transaction = self._queue.get()
+            transaction.transaction_id = self.worker_thread + "_" + str(self.transaction_index)
+            self.transaction_index += 1
             self.stats.append(transaction.run())
             self._queue.task_done()
 
     def __run(self):
+        # get thread id
+        self.worker_thread = str(threading.current_thread().ident)
         for transaction in self.transactions:
             # each transaction returns True if committed or False if aborted
             self.work()
         # stores the number of transactions that committed
         self.result = len(list(filter(lambda x: x, self.stats)))
-

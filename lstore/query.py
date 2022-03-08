@@ -51,19 +51,32 @@ class Query:
         records = temp_page_range.b_read(Page, Row)
         
         #add log information
-        self.table.log.old_value.append([])
-        self.table.log.log_num += 1
-        self.table.log.method.append(1)
-        self.table.log.Xact_id.append(threading.currentThread().ident)
-        self.table.log.table_name.append(self.table.name)
-        self.table.log.method_information.append([Page_Range, Page, Row])
-        rid_list = [[rid,Page,Row]]
-        indirection = temp_page_range.base_page[Page].meta_data.read_INDIRECTION(Row)
-        while rid != indirection:
-            [new_page_index, new_index] = temp_page_range.t_locate(indirection)
-            rid_list.append([indirection,new_page_index, new_index])
-            indirection = temp_page_range.tail_page[new_page_index].meta_data.read_INDIRECTION(new_index)
-        self.table.log.method_meta.append(rid_list)
+        thread_id = threading.currentThread().ident
+        if thread_id in self.table.log.thread_id:
+            self.table.log.old_value[thread_id].append([])
+            self.table.log.method[thread_id].append(1)
+            self.table.log.table_name[thread_id].append(self.table.name)
+            self.table.log.method_information[thread_id].append([Page_Range, Page, Row])
+            rid_list = [[rid,Page,Row]]
+            indirection = temp_page_range.base_page[Page].meta_data.read_INDIRECTION(Row)
+            while rid != indirection:
+                [new_page_index, new_index] = temp_page_range.t_locate(indirection)
+                rid_list.append([indirection,new_page_index, new_index])
+                indirection = temp_page_range.tail_page[new_page_index].meta_data.read_INDIRECTION(new_index)
+            self.table.log.method_meta[thread_id].append(rid_list)
+        else:
+            self.table.log.thread_id.append(thread_id)
+            self.table.log.old_value[thread_id] = [[]]
+            self.table.log.method[thread_id] = [1]
+            self.table.log.table_name[thread_id] = [self.table.name]
+            self.table.log.method_information[thread_id] = [[Page_Range, Page, Row]]
+            rid_list = [[rid,Page,Row]]
+            indirection = temp_page_range.base_page[Page].meta_data.read_INDIRECTION(Row)
+            while rid != indirection:
+                [new_page_index, new_index] = temp_page_range.t_locate(indirection)
+                rid_list.append([indirection,new_page_index, new_index])
+                indirection = temp_page_range.tail_page[new_page_index].meta_data.read_INDIRECTION(new_index)
+            self.table.log.method_meta[thread_id] = [rid_list]
         self.table.lock.release() 
         
         temp_page_range.b_delete(Page, Row)
@@ -131,13 +144,20 @@ class Query:
         
         [rid, page_index, index] = temp_page_range.b_write(columns)
         #add log information
-        self.table.log.old_value.append([])
-        self.table.log.log_num += 1
-        self.table.log.method.append(0)
-        self.table.log.Xact_id.append(threading.currentThread().ident)
-        self.table.log.table_name.append(self.table.name)
-        self.table.log.method_information.append([self.table.page_range_num-1, page_index, index])
-        self.table.log.method_meta.append([])
+        thread_id = threading.currentThread().ident
+        if thread_id in self.table.log.thread_id:
+            self.table.log.old_value[thread_id].append([])
+            self.table.log.method[thread_id].append(0)
+            self.table.log.table_name[thread_id].append(self.table.name)
+            self.table.log.method_information[thread_id].append([self.table.page_range_num-1, page_index, index])
+            self.table.log.method_meta[thread_id].append([])
+        else:
+            self.table.log.thread_id.append(thread_id)
+            self.table.log.old_value[thread_id] = [[]]
+            self.table.log.method[thread_id] = [0]
+            self.table.log.table_name[thread_id] = [self.table.name]
+            self.table.log.method_information[thread_id] = [[self.table.page_range_num-1, page_index, index]]
+            self.table.log.method_meta[thread_id] = [[]]
         self.table.lock.release()
         temp_page_range.base_page[page_index].dirty = 1
         for i in range(len(columns)):
@@ -185,13 +205,20 @@ class Query:
             record = temp_page_range.b_read(Page, Row)
             
             #add log information
-            self.table.log.old_value.append([])
-            self.table.log.log_num += 1
-            self.table.log.method.append(3)
-            self.table.log.Xact_id.append(threading.currentThread().ident)
-            self.table.log.table_name.append(self.table.name)
-            self.table.log.method_information.append([Page_Range, Page, Row])
-            self.table.log.method_meta.append([])
+            thread_id = threading.currentThread().ident
+            if thread_id in self.table.log.thread_id:
+                self.table.log.old_value[thread_id].append([])
+                self.table.log.method[thread_id].append(3)
+                self.table.log.table_name[thread_id].append(self.table.name)
+                self.table.log.method_information[thread_id].append([Page_Range, Page, Row])
+                self.table.log.method_meta[thread_id].append([])
+            else:
+                self.table.log.thread_id.append(thread_id)
+                self.table.log.old_value[thread_id] = [[]]
+                self.table.log.method[thread_id] = [3]
+                self.table.log.table_name[thread_id] = [self.table.name]
+                self.table.log.method_information[thread_id] = [[Page_Range, Page, Row]]
+                self.table.log.method_meta[thread_id] = [[]]
             self.table.lock.release()
             
             columns = []
@@ -248,19 +275,32 @@ class Query:
         temp_page_range.tail_page[-1].dirty = 1
         temp_page_range.pin -= 1
         #add log information
-        self.table.log.old_value.append(old_values)
-        self.table.log.log_num += 1;
-        self.table.log.method.append(2)
-        self.table.log.Xact_id.append(threading.currentThread().ident)
-        self.table.log.table_name.append(self.table.name)
-        self.table.log.method_information.append([Page_Range, Page, Row])
-        rid_list = [[rid,Page,Row]]
-        indirection = temp_page_range.base_page[Page].meta_data.read_INDIRECTION(Row)
-        while rid != indirection:
-            [new_page_index, new_index] = temp_page_range.t_locate(indirection)
-            rid_list.append([indirection,new_page_index, new_index])
-            indirection = temp_page_range.tail_page[new_page_index].meta_data.read_INDIRECTION(new_index)
-        self.table.log.method_meta.append(rid_list)
+        thread_id = threading.currentThread().ident
+        if thread_id in self.table.log.thread_id:
+            self.table.log.old_value[thread_id].append([old_values])
+            self.table.log.method[thread_id].append(2)
+            self.table.log.table_name[thread_id].append(self.table.name)
+            self.table.log.method_information[thread_id].append([Page_Range, Page, Row])
+            rid_list = [[rid,Page,Row]]
+            indirection = temp_page_range.base_page[Page].meta_data.read_INDIRECTION(Row)
+            while rid != indirection:
+                [new_page_index, new_index] = temp_page_range.t_locate(indirection)
+                rid_list.append([indirection,new_page_index, new_index])
+                indirection = temp_page_range.tail_page[new_page_index].meta_data.read_INDIRECTION(new_index)
+            self.table.log.method_meta[thread_id].append(rid_list)
+        else:
+            self.table.log.thread_id.append(thread_id)
+            self.table.log.old_value[thread_id] = [[old_values]]
+            self.table.log.method[thread_id] = [2]
+            self.table.log.table_name[thread_id] = [self.table.name]
+            self.table.log.method_information[thread_id] = [[Page_Range, Page, Row]]
+            rid_list = [[rid,Page,Row]]
+            indirection = temp_page_range.base_page[Page].meta_data.read_INDIRECTION(Row)
+            while rid != indirection:
+                [new_page_index, new_index] = temp_page_range.t_locate(indirection)
+                rid_list.append([indirection,new_page_index, new_index])
+                indirection = temp_page_range.tail_page[new_page_index].meta_data.read_INDIRECTION(new_index)
+            self.table.log.method_meta[thread_id] = [rid_list]
         self.table.lock.release()
         return True
 
@@ -301,14 +341,20 @@ class Query:
             temp_page_range.used_time += 1
             record = temp_page_range.b_read(Page, Row)
             #add log information
-            
-            self.table.log.old_value.append([])
-            self.table.log.log_num += 1
-            self.table.log.method.append(3)
-            self.table.log.Xact_id.append(threading.currentThread().ident)
-            self.table.log.table_name.append(self.table.name)
-            self.table.log.method_information.append([Page_Range, Page, Row])
-            self.table.log.method_meta.append([])
+            thread_id = threading.currentThread().ident
+            if thread_id in self.table.log.thread_id:
+                self.table.log.old_value[thread_id].append([])
+                self.table.log.method[thread_id].append(3)
+                self.table.log.table_name[thread_id].append(self.table.name)
+                self.table.log.method_information[thread_id].append([Page_Range, Page, Row])
+                self.table.log.method_meta[thread_id].append([])
+            else:
+                self.table.log.thread_id.append(thread_id)
+                self.table.log.old_value[thread_id] = [[]]
+                self.table.log.method[thread_id] = [3]
+                self.table.log.table_name[thread_id] = [self.table.name]
+                self.table.log.method_information[thread_id] = [[Page_Range, Page, Row]]
+                self.table.log.method_meta[thread_id] = [[]]
             self.table.lock.release()
             return_sum += record[aggregate_column_index]
             temp_page_range.pin -= 1
