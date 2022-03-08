@@ -89,7 +89,7 @@ class Table:
         self.page_range_num += 1
         pass
 
-    def new_tail_page(self, page_range):
-        self.page_range_list[page_range].more_tail_page(self.rid)
+    def new_tail_page(self, page_range,temp_page_range):
+        temp_page_range.more_tail_page(self.rid)
         self.rid += TAIL_BLOCK_RECORD
         self.pool.add_task(self.__merge, page_range)

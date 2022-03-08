@@ -5,7 +5,7 @@ import pickle
 import os
 from lstore.merge_thread import ThreadPool
 import threading
-from lstore.Log import Log
+from lstore.log import Log
         
 class BufferPool:
     

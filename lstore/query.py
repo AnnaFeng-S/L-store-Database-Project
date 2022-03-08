@@ -3,6 +3,7 @@ from lstore.index import Index
 from lstore.page import Page
 from lstore.db import Database
 import pickle
+import threading
 
 
 class Query:
@@ -48,9 +49,10 @@ class Query:
             self.table.bufferpool.bufferpool[temp_index] = temp_page_range
             temp_page_range.pin += 1
         records = temp_page_range.b_read(Page, Row)
-        self.table.lock.release()
+        
         #add log information
-        self.table.log.log_num += 1;
+        self.table.log.old_value.append([])
+        self.table.log.log_num += 1
         self.table.log.method.append(1)
         self.table.log.Xact_id.append(threading.currentThread().ident)
         self.table.log.table_name.append(self.table.name)
@@ -62,7 +64,8 @@ class Query:
             rid_list.append([indirection,new_page_index, new_index])
             indirection = temp_page_range.tail_page[new_page_index].meta_data.read_INDIRECTION(new_index)
         self.table.log.method_meta.append(rid_list)
-         
+        self.table.lock.release() 
+        
         temp_page_range.b_delete(Page, Row)
         temp_page_range.used_time += 1
         temp_page_range.base_page[Page].dirty = 1
@@ -125,16 +128,17 @@ class Query:
                 self.table.bufferpool.bufferpool[temp_index] = self.table.page_range_list[-1]
                 temp_page_range = self.table.page_range_list[-1]
         temp_page_range.pin += 1
-        self.table.lock.release()
+        
         [rid, page_index, index] = temp_page_range.b_write(columns)
         #add log information
-        self.table.log.log_num += 1;
+        self.table.log.old_value.append([])
+        self.table.log.log_num += 1
         self.table.log.method.append(0)
         self.table.log.Xact_id.append(threading.currentThread().ident)
         self.table.log.table_name.append(self.table.name)
         self.table.log.method_information.append([self.table.page_range_num-1, page_index, index])
         self.table.log.method_meta.append([])
-        
+        self.table.lock.release()
         temp_page_range.base_page[page_index].dirty = 1
         for i in range(len(columns)):
             if self.table.index.indices[i] is not None:
@@ -179,14 +183,16 @@ class Query:
                 temp_page_range.pin += 1
             temp_page_range.used_time += 1
             record = temp_page_range.b_read(Page, Row)
-            self.table.lock.release()
+            
             #add log information
-            self.table.log.log_num += 1;
+            self.table.log.old_value.append([])
+            self.table.log.log_num += 1
             self.table.log.method.append(3)
             self.table.log.Xact_id.append(threading.currentThread().ident)
             self.table.log.table_name.append(self.table.name)
             self.table.log.method_information.append([Page_Range, Page, Row])
             self.table.log.method_meta.append([])
+            self.table.lock.release()
             
             columns = []
             for i in range(self.table.num_columns):
@@ -229,9 +235,9 @@ class Query:
             self.table.bufferpool.bufferpool[temp_index] = temp_page_range
             temp_page_range.pin += 1
         temp_page_range.used_time += 1
-        self.table.lock.release()
+        
         if (temp_page_range.tail_has_capacity() == False):
-            self.table.new_tail_page(Page_Range)
+            self.table.new_tail_page(Page_Range,temp_page_range)
         temp_page_range.base_page[Page].dirty = 1
         old_values = temp_page_range.b_read(Page, Row)
         temp_page_range.t_update(Page, Row, columns)
@@ -242,6 +248,7 @@ class Query:
         temp_page_range.tail_page[-1].dirty = 1
         temp_page_range.pin -= 1
         #add log information
+        self.table.log.old_value.append(old_values)
         self.table.log.log_num += 1;
         self.table.log.method.append(2)
         self.table.log.Xact_id.append(threading.currentThread().ident)
@@ -254,6 +261,7 @@ class Query:
             rid_list.append([indirection,new_page_index, new_index])
             indirection = temp_page_range.tail_page[new_page_index].meta_data.read_INDIRECTION(new_index)
         self.table.log.method_meta.append(rid_list)
+        self.table.lock.release()
         return True
 
     """
@@ -293,14 +301,15 @@ class Query:
             temp_page_range.used_time += 1
             record = temp_page_range.b_read(Page, Row)
             #add log information
-            self.table.lock.release()
-            self.table.log.log_num += 1;
+            
+            self.table.log.old_value.append([])
+            self.table.log.log_num += 1
             self.table.log.method.append(3)
             self.table.log.Xact_id.append(threading.currentThread().ident)
             self.table.log.table_name.append(self.table.name)
             self.table.log.method_information.append([Page_Range, Page, Row])
             self.table.log.method_meta.append([])
-            
+            self.table.lock.release()
             return_sum += record[aggregate_column_index]
             temp_page_range.pin -= 1
         return return_sum
