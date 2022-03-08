@@ -44,6 +44,7 @@ class Transaction:
 
     def abort(self,index):
         print('abort')
+        self.table[0].lock.acquire()
         thread_id = threading.currentThread().ident
         for i in range(index):
             query, args = self.queries[index-i]
@@ -113,6 +114,7 @@ class Transaction:
         log.method_information.pop(thread_id)
         log.method_meta.pop(thread_id)
         log.old_value.pop(thread_id)
+        self.table[0].lock.release()
         return False
 
     def commit(self):
