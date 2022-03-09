@@ -475,7 +475,7 @@ class Query:
         return return_min
                 
     def average(self, start_range, end_range, average_column_index):
-        return_sum = sum(start_range, end_range, average_column_index)
+        return_sum = self.sum(start_range, end_range, average_column_index)
         return_average = return_sum/(end_range-start_range)
         return return_average
     
@@ -483,13 +483,14 @@ class Query:
         query_columns = []
         for i in range(self.table.num_columns):
             query_columns.append(1)
-        return len(select(index_key, column, query_columns))
+        return len(self.select(index_key, column, query_columns))
     
     def first(self, column):
         check = 0
         for rid in range(self.table.rid):
             try:
                 [Page_Range, Page, Row] = self.table.directory[rid]
+                self.table.lock.acquire()
                 if [self.table.name, Page_Range] in self.table.bufferpool.bufferpool_list:
                     temp_page_range = self.table.bufferpool.bufferpool[
                         self.table.bufferpool.bufferpool_list.index([self.table.name, Page_Range])]
@@ -509,6 +510,21 @@ class Query:
                 temp_page_range.used_time += 1
                 record = temp_page_range.b_read(Page, Row)
                 check = 1
+                thread_id = threading.currentThread().ident
+                if thread_id in self.table.log.thread_id:
+                    self.table.log.old_value[thread_id].append([])
+                    self.table.log.method[thread_id].append(3)
+                    self.table.log.table_name[thread_id].append(self.table.name)
+                    self.table.log.method_information[thread_id].append([Page_Range, Page, Row])
+                    self.table.log.method_meta[thread_id].append([])
+                else:
+                    self.table.log.thread_id.append(thread_id)
+                    self.table.log.old_value[thread_id] = [[]]
+                    self.table.log.method[thread_id] = [3]
+                    self.table.log.table_name[thread_id] = [self.table.name]
+                    self.table.log.method_information[thread_id] = [[Page_Range, Page, Row]]
+                    self.table.log.method_meta[thread_id] = [[]]
+                self.table.lock.release()
                 break
             except:
                 continue
@@ -520,6 +536,7 @@ class Query:
         for rid in range(self.table.rid):
             try:
                 [Page_Range, Page, Row] = self.table.directory[len(self.table.rid)-1-rid]
+                self.table.lock.acquire()
                 if [self.table.name, Page_Range] in self.table.bufferpool.bufferpool_list:
                     temp_page_range = self.table.bufferpool.bufferpool[
                         self.table.bufferpool.bufferpool_list.index([self.table.name, Page_Range])]
@@ -539,6 +556,21 @@ class Query:
                 temp_page_range.used_time += 1
                 record = temp_page_range.b_read(Page, Row)
                 check = 1
+                thread_id = threading.currentThread().ident
+                if thread_id in self.table.log.thread_id:
+                    self.table.log.old_value[thread_id].append([])
+                    self.table.log.method[thread_id].append(3)
+                    self.table.log.table_name[thread_id].append(self.table.name)
+                    self.table.log.method_information[thread_id].append([Page_Range, Page, Row])
+                    self.table.log.method_meta[thread_id].append([])
+                else:
+                    self.table.log.thread_id.append(thread_id)
+                    self.table.log.old_value[thread_id] = [[]]
+                    self.table.log.method[thread_id] = [3]
+                    self.table.log.table_name[thread_id] = [self.table.name]
+                    self.table.log.method_information[thread_id] = [[Page_Range, Page, Row]]
+                    self.table.log.method_meta[thread_id] = [[]]
+                self.table.lock.release()
                 break
             except:
                 continue
