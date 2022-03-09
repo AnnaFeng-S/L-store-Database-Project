@@ -377,3 +377,172 @@ class Query:
             u = self.update(key, *updated_columns)
             return u
         return False
+    
+    def max(self, start_range, end_range, max_column_index):
+        return_max = -float('inf')
+        rids = self.table.index.locate_range(start_range, end_range, self.table.key)
+        if rids is None:
+            return False
+        return_sum = 0
+        for rid in rids:
+            [Page_Range, Page, Row] = self.table.directory[rid]
+            self.table.lock.acquire()
+            if [self.table.name, Page_Range] in self.table.bufferpool.bufferpool_list:
+                temp_page_range = self.table.bufferpool.bufferpool[
+                    self.table.bufferpool.bufferpool_list.index([self.table.name, Page_Range])]
+                temp_page_range.pin += 1
+            elif self.table.bufferpool.has_capacity() == True:
+                self.table.bufferpool.bufferpool_list.append([self.table.name, Page_Range])
+                temp_page_range = self.table.bufferpool.disk_to_memory(self.table.name, Page_Range)
+                self.table.bufferpool.bufferpool.append(temp_page_range)
+                temp_page_range.pin += 1
+            else:
+                temp_index = self.table.bufferpool.min_used_time()
+                #if self.table.bufferpool.bufferpool[temp_index].dirty == 1:
+                self.table.bufferpool.memory_to_disk(temp_index)
+                temp_page_range = self.table.bufferpool.disk_to_memory(self.table.name, Page_Range)
+                self.table.bufferpool.bufferpool_list[temp_index] = [self.table.name, Page_Range]
+                self.table.bufferpool.bufferpool[temp_index] = temp_page_range
+                temp_page_range.pin += 1
+            temp_page_range.used_time += 1
+            record = temp_page_range.b_read(Page, Row)
+            #add log information
+            thread_id = threading.currentThread().ident
+            if thread_id in self.table.log.thread_id:
+                self.table.log.old_value[thread_id].append([])
+                self.table.log.method[thread_id].append(3)
+                self.table.log.table_name[thread_id].append(self.table.name)
+                self.table.log.method_information[thread_id].append([Page_Range, Page, Row])
+                self.table.log.method_meta[thread_id].append([])
+            else:
+                self.table.log.thread_id.append(thread_id)
+                self.table.log.old_value[thread_id] = [[]]
+                self.table.log.method[thread_id] = [3]
+                self.table.log.table_name[thread_id] = [self.table.name]
+                self.table.log.method_information[thread_id] = [[Page_Range, Page, Row]]
+                self.table.log.method_meta[thread_id] = [[]]
+            self.table.lock.release()
+            if record[max_column_index] > return_max:
+                return_max = record[max_column_index]
+        return return_max
+    
+    def min(self, start_range, end_range, min_column_index):
+        return_min = float('inf')
+        rids = self.table.index.locate_range(start_range, end_range, self.table.key)
+        if rids is None:
+            return False
+        return_sum = 0
+        for rid in rids:
+            [Page_Range, Page, Row] = self.table.directory[rid]
+            self.table.lock.acquire()
+            if [self.table.name, Page_Range] in self.table.bufferpool.bufferpool_list:
+                temp_page_range = self.table.bufferpool.bufferpool[
+                    self.table.bufferpool.bufferpool_list.index([self.table.name, Page_Range])]
+                temp_page_range.pin += 1
+            elif self.table.bufferpool.has_capacity() == True:
+                self.table.bufferpool.bufferpool_list.append([self.table.name, Page_Range])
+                temp_page_range = self.table.bufferpool.disk_to_memory(self.table.name, Page_Range)
+                self.table.bufferpool.bufferpool.append(temp_page_range)
+                temp_page_range.pin += 1
+            else:
+                temp_index = self.table.bufferpool.min_used_time()
+                #if self.table.bufferpool.bufferpool[temp_index].dirty == 1:
+                self.table.bufferpool.memory_to_disk(temp_index)
+                temp_page_range = self.table.bufferpool.disk_to_memory(self.table.name, Page_Range)
+                self.table.bufferpool.bufferpool_list[temp_index] = [self.table.name, Page_Range]
+                self.table.bufferpool.bufferpool[temp_index] = temp_page_range
+                temp_page_range.pin += 1
+            temp_page_range.used_time += 1
+            record = temp_page_range.b_read(Page, Row)
+            #add log information
+            thread_id = threading.currentThread().ident
+            if thread_id in self.table.log.thread_id:
+                self.table.log.old_value[thread_id].append([])
+                self.table.log.method[thread_id].append(3)
+                self.table.log.table_name[thread_id].append(self.table.name)
+                self.table.log.method_information[thread_id].append([Page_Range, Page, Row])
+                self.table.log.method_meta[thread_id].append([])
+            else:
+                self.table.log.thread_id.append(thread_id)
+                self.table.log.old_value[thread_id] = [[]]
+                self.table.log.method[thread_id] = [3]
+                self.table.log.table_name[thread_id] = [self.table.name]
+                self.table.log.method_information[thread_id] = [[Page_Range, Page, Row]]
+                self.table.log.method_meta[thread_id] = [[]]
+            self.table.lock.release()
+            if record[min_column_index] < return_min:
+                return_min = record[min_column_index]
+        return return_min
+                
+    def average(self, start_range, end_range, average_column_index):
+        return_sum = sum(start_range, end_range, average_column_index)
+        return_average = return_sum/(end_range-start_range)
+        return return_average
+    
+    def count(self, index_key, column):
+        query_columns = []
+        for i in range(self.table.num_columns):
+            query_columns.append(1)
+        return len(select(index_key, column, query_columns))
+    
+    def first(self, column):
+        check = 0
+        for rid in range(self.table.rid):
+            try:
+                [Page_Range, Page, Row] = self.table.directory[rid]
+                if [self.table.name, Page_Range] in self.table.bufferpool.bufferpool_list:
+                    temp_page_range = self.table.bufferpool.bufferpool[
+                        self.table.bufferpool.bufferpool_list.index([self.table.name, Page_Range])]
+                    temp_page_range.pin += 1
+                elif self.table.bufferpool.has_capacity() == True:
+                    self.table.bufferpool.bufferpool_list.append([self.table.name, Page_Range])
+                    temp_page_range = self.table.bufferpool.disk_to_memory(self.table.name, Page_Range)
+                    self.table.bufferpool.bufferpool.append(temp_page_range)
+                    temp_page_range.pin += 1
+                else:
+                    temp_index = self.table.bufferpool.min_used_time()
+                    self.table.bufferpool.memory_to_disk(temp_index)
+                    temp_page_range = self.table.bufferpool.disk_to_memory(self.table.name, Page_Range)
+                    self.table.bufferpool.bufferpool_list[temp_index] = [self.table.name, Page_Range]
+                    self.table.bufferpool.bufferpool[temp_index] = temp_page_range
+                    temp_page_range.pin += 1
+                temp_page_range.used_time += 1
+                record = temp_page_range.b_read(Page, Row)
+                check = 1
+                break
+            except:
+                continue
+        if check == 1:
+            return record[column]
+        
+    def last(self, column):
+        check = 0
+        for rid in range(self.table.rid):
+            try:
+                [Page_Range, Page, Row] = self.table.directory[len(self.table.rid)-1-rid]
+                if [self.table.name, Page_Range] in self.table.bufferpool.bufferpool_list:
+                    temp_page_range = self.table.bufferpool.bufferpool[
+                        self.table.bufferpool.bufferpool_list.index([self.table.name, Page_Range])]
+                    temp_page_range.pin += 1
+                elif self.table.bufferpool.has_capacity() == True:
+                    self.table.bufferpool.bufferpool_list.append([self.table.name, Page_Range])
+                    temp_page_range = self.table.bufferpool.disk_to_memory(self.table.name, Page_Range)
+                    self.table.bufferpool.bufferpool.append(temp_page_range)
+                    temp_page_range.pin += 1
+                else:
+                    temp_index = self.table.bufferpool.min_used_time()
+                    self.table.bufferpool.memory_to_disk(temp_index)
+                    temp_page_range = self.table.bufferpool.disk_to_memory(self.table.name, Page_Range)
+                    self.table.bufferpool.bufferpool_list[temp_index] = [self.table.name, Page_Range]
+                    self.table.bufferpool.bufferpool[temp_index] = temp_page_range
+                    temp_page_range.pin += 1
+                temp_page_range.used_time += 1
+                record = temp_page_range.b_read(Page, Row)
+                check = 1
+                break
+            except:
+                continue
+        if check == 1:
+            return record[column]
+        
+    
