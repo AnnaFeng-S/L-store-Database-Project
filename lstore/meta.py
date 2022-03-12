@@ -75,6 +75,7 @@ class Tail_Meta:
     def __init__(self):
         self.TID = bytearray(4096)
         self.RID = bytearray(4096)
+        self.SCHEMA = bytearray(4096)
         self.INDIRECTION = bytearray(4096)
         self.TIMESTAMP = bytearray(4096)
         self.num_records = 0
@@ -109,3 +110,11 @@ class Tail_Meta:
 
     def update_TID(self, index, TID):
         self.TID[index * 8: index * 8 + 8] = TID.to_bytes(8, byteorder='big')
+
+    def set_bit(self, n, index):
+        initial = int.from_bytes(self.SCHEMA[index * 8: index * 8 + 8], byteorder='big')
+        self.SCHEMA[index * 8: index * 8 + 8] = (initial | (1 << n)).to_bytes(8, byteorder='big')
+
+    def read_bit(self, n, index):
+        initial = int.from_bytes(self.SCHEMA[index * 8: index * 8 + 8], byteorder='big')
+        return (initial >> n) & 1

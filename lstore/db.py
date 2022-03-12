@@ -5,6 +5,7 @@ import pickle
 import os
 from lstore.merge_thread import ThreadPool
 import threading
+from lstore.log import Log
         
 class BufferPool:
     
@@ -135,6 +136,7 @@ class Database():
         self.bufferpool = BufferPool()
         self.path = ''
         self.pool = ThreadPool()
+        self.log = Log()
         print("Database created")
         pass
 
@@ -147,12 +149,14 @@ class Database():
         
 
     def close(self):
-        self.pool.wail_complete()
+        self.pool.wait_complete()
         for table in self.tables:
             f = open(table.name+'_directory','wb')
             pickle.dump(table.directory,f)
             os.path.join(table.name+'_directory')
             f.close()
+            table.index.rid = table.rid
+            table.index.table_page_range = table.page_range_num
             table.index.table = None
             f = open(table.name+'_index','wb')
             pickle.dump(table.index,f)
@@ -170,7 +174,7 @@ class Database():
     """
     def create_table(self, name, num_columns, key_index):
         print("Table " + name + " created")
-        table = Table(name, num_columns, key_index, self.pool, self.bufferpool)
+        table = Table(name, num_columns, key_index, self.pool, self.bufferpool,self.log)
         self.tables.append(table)
         self.table_directory[name] = len(self.tables) - 1
         return table
@@ -179,8 +183,27 @@ class Database():
     # Deletes the specified table
     """
     def drop_table(self, name):
+        file_name = name
         print("Table " + name + " dropped")
-        self.tables.pop(self.table_directory[name])
+        check_route = "./" + name + "_"
+        if name in self.table_directory:
+            self.tables.pop(self.table_directory[name])
+            self.table_directory.pop(name)
+        for root, dirs, files in os.walk("."):
+            for name in files:
+                route = os.path.join(root, name)
+                if check_route in route:
+                    os.remove(route)
+        keys = self.bufferpool.bufferpool_list.copy()
+        i = 0
+        counter = 0
+        for key in keys:
+            if file_name == key[0]:
+                self.bufferpool.bufferpool.pop(i-counter)
+                self.bufferpool.bufferpool_list.remove(key)
+                counter += 1
+            i += 1
+
 
     """
     # Returns table with the passed name
@@ -189,9 +212,11 @@ class Database():
         f = open(name+'_index','rb')
         index = pickle.load(f)
         f.close()
-        table = Table(name, index.table_num_columns, index.table_key, self.pool, self.bufferpool)
+        table = Table(name, index.table_num_columns, index.table_key, self.pool, self.bufferpool, self.log)
         table.index = index
+        table.rid = table.index.rid
         table.index.table = table
+        table.page_range_num = table.index.table_page_range
         f = open(name+'_directory','rb')
         directory = pickle.load(f)
         f.close()

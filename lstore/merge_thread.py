@@ -1,6 +1,5 @@
 import threading, queue, time
 
-
 class MyThread(threading.Thread):
     def __init__(self, queue):
         super(MyThread, self).__init__()
@@ -26,5 +25,5 @@ class ThreadPool():
     def add_task(self, f, *args, **kargs):
         self._queue.put((f, args, kargs))
 
-    def wail_complete(self):
+    def wait_complete(self):
         self._queue.join()
